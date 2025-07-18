@@ -35,6 +35,11 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.android)
         }
+        
+        iosMain.dependencies {
+            implementation(libs.ktor.client.darwin)
+        }
+        
         commonMain.dependencies {
             // Compose Multiplatform
             implementation(compose.runtime)
@@ -63,8 +68,12 @@ kotlin {
             // Navigation
             implementation(libs.navigation.compose)
             
-            // Image Loading - TODO: Re-add when needed
-            // implementation(libs.coil.compose)
+            // Image Loading
+            implementation(libs.coil.compose)
+            implementation(libs.coil.network.ktor)
+            
+            // Material Icons (using compose BOM)
+            implementation(compose.materialIconsExtended)
             
             // Coroutines
             implementation(libs.coroutines.core)

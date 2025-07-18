@@ -6,29 +6,29 @@ import kotlinx.serialization.SerialName
 @Serializable
 data class F1DriverApiResponse(
     @SerialName("meeting_key")
-    val meetingKey: Int,
+    val meetingKey: Int?,
     @SerialName("session_key")
-    val sessionKey: Int,
+    val sessionKey: Int?,
     @SerialName("driver_number")
     val driverNumber: Int,
     @SerialName("broadcast_name")
-    val broadcastName: String,
+    val broadcastName: String?,
     @SerialName("full_name")
-    val fullName: String,
+    val fullName: String?,
     @SerialName("name_acronym")
-    val nameAcronym: String,
+    val nameAcronym: String?,
     @SerialName("team_name")
-    val teamName: String,
+    val teamName: String?,
     @SerialName("team_colour")
-    val teamColour: String,
+    val teamColour: String?,
     @SerialName("first_name")
-    val firstName: String,
+    val firstName: String?,
     @SerialName("last_name")
-    val lastName: String,
+    val lastName: String?,
     @SerialName("headshot_url")
     val headshotUrl: String?,
     @SerialName("country_code")
-    val countryCode: String
+    val countryCode: String?
 )
 
 sealed class ApiResult<out T> {

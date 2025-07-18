@@ -17,13 +17,13 @@ data class F1Driver(
 
 fun F1DriverApiResponse.toDomainModel() = F1Driver(
     driverNumber = driverNumber,
-    fullName = fullName,
-    firstName = firstName,
-    lastName = lastName,
-    nameAcronym = nameAcronym,
-    teamName = teamName,
-    teamColour = teamColour,
+    fullName = fullName ?: "Unknown Driver",
+    firstName = firstName ?: "Unknown",
+    lastName = lastName ?: "Driver",
+    nameAcronym = nameAcronym ?: "UNK",
+    teamName = teamName ?: "Unknown Team",
+    teamColour = teamColour ?: "808080", // Default gray color
     headshotUrl = headshotUrl,
-    countryCode = countryCode,
-    broadcastName = broadcastName
+    countryCode = countryCode ?: "XX",
+    broadcastName = broadcastName ?: fullName ?: "Unknown"
 )

@@ -16,12 +16,12 @@ kotlin = "2.2.0"
 
 
 # KMP Architecture dependencies
-ktor = "2.3.7"
+ktor = "3.2.2"
 koin = "3.5.3"
 koinCompose = "1.1.5"
 orbitMvi = "10.0.0"
 navigation = "2.7.0-alpha07"
-coil = "3.0.4"
+coil = "3.2.0"
 coroutines = "1.8.1"
 serialization = "1.7.3"
 datetime = "0.6.0"
@@ -39,12 +39,14 @@ androidx-activity-compose = { module = "androidx.activity:activity-compose", ver
 androidx-lifecycle-viewmodel = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
 
+
 # Ktor - Networking
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
 ktor-client-android = { module = "io.ktor:ktor-client-android", version.ref = "ktor" }
+ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
 ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
 
 # Koin - Dependency Injection
@@ -60,8 +62,8 @@ orbit-test = { module = "org.orbit-mvi:orbit-test", version.ref = "orbitMvi" }
 navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigation" }
 
 # Image Loading
-coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coil" }
-
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
+coil-network-ktor = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }
 
 # Coroutines
 coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
