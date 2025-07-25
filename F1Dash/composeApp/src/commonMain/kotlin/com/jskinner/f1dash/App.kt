@@ -1,29 +1,29 @@
 package com.jskinner.f1dash
 
-import androidx.compose.material3.MaterialTheme
-import com.jskinner.f1dash.presentation.theme.F1Theme
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.runtime.*
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import org.jetbrains.compose.ui.tooling.preview.Preview
-import org.koin.compose.KoinApplication
 import com.jskinner.f1dash.di.modules.appModules
-import com.jskinner.f1dash.presentation.screens.DriversListScreen
-import com.jskinner.f1dash.presentation.screens.RaceResultsScreen
-import com.jskinner.f1dash.presentation.screens.TeamsScreen
-import com.jskinner.f1dash.presentation.screens.StatsScreen
 import com.jskinner.f1dash.presentation.navigation.F1BottomNavigation
 import com.jskinner.f1dash.presentation.navigation.F1Destinations
+import com.jskinner.f1dash.presentation.screens.DriversListScreen
+import com.jskinner.f1dash.presentation.screens.RaceResultsScreen
+import com.jskinner.f1dash.presentation.screens.StatsScreen
+import com.jskinner.f1dash.presentation.screens.TeamsScreen
+import com.jskinner.f1dash.presentation.theme.F1Theme
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.ui.tooling.preview.Preview
+import org.koin.compose.KoinApplication
 
 @Composable
 @Preview

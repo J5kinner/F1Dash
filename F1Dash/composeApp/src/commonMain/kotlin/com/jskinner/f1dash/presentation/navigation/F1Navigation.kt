@@ -67,8 +67,7 @@ fun F1BottomNavigation(
                         // Pop up to the start destination of the graph to
                         // avoid building up a large stack of destinations
                         // on the back stack as users select items
-                        val startDestination = navController.graph.findStartDestination()
-                        popUpTo(startDestination.id) {
+                        popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
                         }
                         // Avoid multiple copies of the same destination when

@@ -5,14 +5,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -22,17 +22,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.SubcomposeAsyncImage
-import org.koin.compose.koinInject
-import org.orbitmvi.orbit.compose.collectAsState
-import org.orbitmvi.orbit.compose.collectSideEffect
-import com.jskinner.f1dash.presentation.viewmodels.F1RaceViewModel
-import com.jskinner.f1dash.presentation.viewmodels.F1RaceSideEffect
-import com.jskinner.f1dash.presentation.viewmodels.F1RaceState
 import com.jskinner.f1dash.domain.models.F1DriverResult
 import com.jskinner.f1dash.domain.models.F1RaceData
 import com.jskinner.f1dash.domain.models.F1Weather
+import com.jskinner.f1dash.presentation.viewmodels.F1RaceSideEffect
+import com.jskinner.f1dash.presentation.viewmodels.F1RaceState
+import com.jskinner.f1dash.presentation.viewmodels.F1RaceViewModel
+import org.koin.compose.koinInject
+import org.orbitmvi.orbit.compose.collectAsState
+import org.orbitmvi.orbit.compose.collectSideEffect
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -140,5 +140,9 @@ fun Double.formatLapTime(): String {
     val totalSeconds = this
     val minutes = (totalSeconds / 60).toInt()
     val seconds = totalSeconds % 60
-    return String.format("%d:%06.3f", minutes, seconds)
+    val wholeSeconds = seconds.toInt()
+    val milliseconds = ((seconds - wholeSeconds) * 1000).toInt()
+    val paddedSeconds = wholeSeconds.toString().padStart(2, '0')
+    val paddedMilliseconds = milliseconds.toString().padStart(3, '0')
+    return "$minutes:$paddedSeconds.$paddedMilliseconds"
 }
