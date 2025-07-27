@@ -4,7 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -20,14 +20,15 @@ sealed class F1Destinations(
     val icon: ImageVector
 ) {
     data object Race : F1Destinations("race", "Race", Icons.Default.Flag)
-    data object Drivers : F1Destinations("drivers", "Drivers", Icons.Default.Person)
+    data object PreviousRaces : F1Destinations("previous_races", "Previous Races", Icons.Default.CalendarMonth)
     data object Teams : F1Destinations("teams", "Teams", Icons.Default.Group)
     data object Stats : F1Destinations("stats", "Stats", Icons.Default.BarChart)
+    data object Replay : F1Destinations("replay", "Replay", Icons.Default.Flag)
 }
 
 val bottomNavItems = listOf(
     F1Destinations.Race,
-    F1Destinations.Drivers,
+    F1Destinations.PreviousRaces,
 //    F1Destinations.Teams,
 //    F1Destinations.Stats
 )
@@ -64,7 +65,8 @@ fun F1BottomNavigation(
                 selected = selected,
                 onClick = {
                     navController.navigate(destination.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
+                        val startDestination = navController.graph.findStartDestination()
+                        popUpTo(startDestination.route ?: destination.route) {
                             saveState = true
                         }
                         launchSingleTop = true

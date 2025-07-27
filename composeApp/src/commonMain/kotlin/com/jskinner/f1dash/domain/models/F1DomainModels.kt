@@ -30,47 +30,6 @@ data class F1Session(
     val year: Int
 )
 
-data class F1Lap(
-    val sessionKey: Int,
-    val meetingKey: Int,
-    val driverNumber: Int,
-    val lapNumber: Int,
-    val lapDuration: Double?,
-    val isPitOutLap: Boolean,
-    val dateStart: String
-)
-
-data class F1Position(
-    val sessionKey: Int,
-    val meetingKey: Int,
-    val driverNumber: Int,
-    val position: Int,
-    val date: String
-)
-
-data class F1Weather(
-    val sessionKey: Int,
-    val meetingKey: Int,
-    val airTemperature: Double,
-    val humidity: Int,
-    val pressure: Double,
-    val rainfall: Int,
-    val trackTemperature: Double,
-    val windDirection: Int,
-    val windSpeed: Double,
-    val date: String
-)
-
-data class F1Stint(
-    val sessionKey: Int,
-    val meetingKey: Int,
-    val driverNumber: Int,
-    val compound: String,
-    val lapStart: Int,
-    val lapEnd: Int,
-    val tyreAgeAtStart: Int,
-    val stintNumber: Int
-)
 
 data class F1SessionResult(
     val sessionKey: Int,
@@ -98,7 +57,6 @@ data class F1DriverResult(
 data class F1RaceData(
     val session: F1Session,
     val driverResults: List<F1DriverResult>,
-    val weather: F1Weather?,
     val fastestLap: F1DriverResult?
 )
 
@@ -125,52 +83,69 @@ fun F1SessionApiResponse.toDomainModel() = F1Session(
     location = location ?: "Unknown Location",
     countryName = countryName ?: "Unknown Country",
     countryCode = countryCode ?: "XX",
-    circuitName = circuitName ?: "Unknown Circuit",
-    circuitShortName = circuitShortName ?: "Unknown",
+    circuitName = getCircuitName(circuitName, circuitShortName, location, countryName, countryCode),
+    circuitShortName = circuitShortName ?: circuitName ?: "Unknown",
     year = year ?: 2024
 )
 
-fun F1LapApiResponse.toDomainModel() = F1Lap(
-    sessionKey = sessionKey,
-    meetingKey = meetingKey,
-    driverNumber = driverNumber,
-    lapNumber = lapNumber,
-    lapDuration = lapDuration,
-    isPitOutLap = isPitOutLap,
-    dateStart = dateStart ?: ""
-)
+private fun getCircuitName(
+    circuitName: String?,
+    circuitShortName: String?,
+    location: String?,
+    countryName: String?,
+    countryCode: String?
+): String {
+    // Try circuit name first
+    if (!circuitName.isNullOrBlank() && circuitName != "null") {
+        return circuitName
+    }
 
-fun F1PositionApiResponse.toDomainModel() = F1Position(
-    sessionKey = sessionKey,
-    meetingKey = meetingKey,
-    driverNumber = driverNumber,
-    position = position,
-    date = date ?: ""
-)
+    // Try circuit short name
+    if (!circuitShortName.isNullOrBlank() && circuitShortName != "null") {
+        return circuitShortName
+    }
 
-fun F1WeatherApiResponse.toDomainModel() = F1Weather(
-    sessionKey = sessionKey,
-    meetingKey = meetingKey,
-    airTemperature = airTemperature ?: 0.0,
-    humidity = humidity ?: 0,
-    pressure = pressure ?: 0.0,
-    rainfall = rainfall ?: 0,
-    trackTemperature = trackTemperature ?: 0.0,
-    windDirection = windDirection ?: 0,
-    windSpeed = windSpeed ?: 0.0,
-    date = date ?: ""
-)
+    // Try location
+    if (!location.isNullOrBlank() && location != "null") {
+        return location
+    }
 
-fun F1StintApiResponse.toDomainModel() = F1Stint(
-    sessionKey = sessionKey,
-    meetingKey = meetingKey,
-    driverNumber = driverNumber,
-    compound = compound ?: "UNKNOWN",
-    lapStart = lapStart ?: 0,
-    lapEnd = lapEnd ?: 0,
-    tyreAgeAtStart = tyreAgeAtStart ?: 0,
-    stintNumber = stintNumber ?: 0
-)
+    // Try to map country code to known circuit names
+    val knownCircuits = mapOf(
+        "AUS" to "Albert Park Circuit",
+        "SAU" to "Jeddah Corniche Circuit",
+        "AUS" to "Albert Park Circuit",
+        "BHR" to "Bahrain International Circuit",
+        "CHN" to "Shanghai International Circuit",
+        "JPN" to "Suzuka International Racing Course",
+        "MCO" to "Circuit de Monaco",
+        "CAN" to "Circuit Gilles Villeneuve",
+        "ESP" to "Circuit de Barcelona-Catalunya",
+        "AUT" to "Red Bull Ring",
+        "GBR" to "Silverstone Circuit",
+        "HUN" to "Hungaroring",
+        "BEL" to "Circuit de Spa-Francorchamps",
+        "NLD" to "Circuit Zandvoort",
+        "ITA" to "Monza Circuit",
+        "SGP" to "Marina Bay Street Circuit",
+        "USA" to "Circuit of the Americas",
+        "MEX" to "Autódromo Hermanos Rodríguez",
+        "BRA" to "Interlagos Circuit",
+        "QAT" to "Losail International Circuit",
+        "UAE" to "Yas Marina Circuit"
+    )
+
+    countryCode?.let { code ->
+        knownCircuits[code]?.let { return it }
+    }
+
+    // Try country name
+    if (!countryName.isNullOrBlank() && countryName != "null") {
+        return "$countryName Grand Prix"
+    }
+
+    return "Unknown Circuit"
+}
 
 fun F1SessionResultApiResponse.toDomainModel() = F1SessionResult(
     sessionKey = sessionKey,
@@ -185,6 +160,39 @@ fun F1SessionResultApiResponse.toDomainModel() = F1SessionResult(
     gapToLeader = gapToLeader,
     lapsCompleted = lapsCompleted
 )
+
+data class F1ReplayFrame(
+    val lapNumber: Int,
+    val elapsedTime: Double,
+    val driverPositions: List<F1DriverPosition>
+)
+
+data class F1DriverPosition(
+    val driverNumber: Int,
+    val position: Int,
+    val gap: String,
+    val lapTime: String,
+    val tyre: String,
+    val pitStops: Int
+)
+
+data class F1RaceReplay(
+    val session: F1Session,
+    val frames: List<F1ReplayFrame>,
+    val totalLaps: Int,
+    val raceDuration: Double,
+    val drivers: Map<Int, F1Driver> = emptyMap()
+)
+
+data class F1ReplayState(
+    val isPlaying: Boolean = false,
+    val currentFrameIndex: Int = 0,
+    val playbackSpeed: Float = 1.0f,
+    val totalFrames: Int = 0
+) {
+    val progress: Float
+        get() = if (totalFrames > 0) currentFrameIndex.toFloat() / totalFrames else 0f
+}
 
 fun Double.formatLapTime(): String {
     if (this <= 0) return "--:--"
