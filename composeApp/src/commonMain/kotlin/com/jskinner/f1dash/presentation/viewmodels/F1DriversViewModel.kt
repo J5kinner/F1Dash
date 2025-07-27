@@ -1,13 +1,9 @@
 package com.jskinner.f1dash.presentation.viewmodels
 
-import androidx.lifecycle.ViewModel
 import com.jskinner.f1dash.data.models.ApiResult
 import com.jskinner.f1dash.domain.models.F1Driver
 import com.jskinner.f1dash.domain.repository.F1Repository
 import kotlinx.coroutines.flow.catch
-import org.orbitmvi.orbit.Container
-import org.orbitmvi.orbit.ContainerHost
-import org.orbitmvi.orbit.viewmodel.container
 
 sealed interface F1DriversState {
     data class Loading(
@@ -48,10 +44,7 @@ sealed interface F1DriversSideEffect {
 
 class F1DriversViewModel(
     private val f1Repository: F1Repository
-) : ViewModel(), ContainerHost<F1DriversState, F1DriversSideEffect> {
-
-    override val container: Container<F1DriversState, F1DriversSideEffect> =
-        container(F1DriversState.Idle())
+) : BaseViewModel<F1DriversState, F1DriversSideEffect>(F1DriversState.Idle()) {
 
     init {
         loadDrivers()
@@ -84,12 +77,11 @@ class F1DriversViewModel(
                         }
                     }
                     is ApiResult.Success -> {
-                        val currentQuery = getCurrentSearchQuery()
-                        val filteredDrivers = filterDrivers(result.data, currentQuery)
+                        val filteredDrivers = filterDrivers(result.data, getCurrentSearchQuery())
                         reduce { 
                             F1DriversState.Success(
                                 drivers = result.data,
-                                searchQuery = currentQuery,
+                                searchQuery = getCurrentSearchQuery(),
                                 filteredDrivers = filteredDrivers,
                                 selectedSessionKey = getCurrentSessionKey()
                             )
@@ -103,69 +95,6 @@ class F1DriversViewModel(
                                 searchQuery = getCurrentSearchQuery(),
                                 filteredDrivers = getCurrentFilteredDrivers(),
                                 selectedSessionKey = getCurrentSessionKey()
-                            )
-                        }
-                        postSideEffect(F1DriversSideEffect.ShowToast(result.message))
-                    }
-                }
-            }
-    }
-
-    fun loadDriversForSession(sessionKey: Int) = intent {
-        reduce { 
-            when (val currentState = state) {
-                is F1DriversState.Loading -> currentState.copy(selectedSessionKey = sessionKey)
-                is F1DriversState.Success -> currentState.copy(selectedSessionKey = sessionKey)
-                is F1DriversState.Error -> currentState.copy(selectedSessionKey = sessionKey)
-                is F1DriversState.Idle -> currentState.copy(selectedSessionKey = sessionKey)
-            }
-        }
-        
-        f1Repository.getDriversForSession(sessionKey)
-            .catch { throwable ->
-                reduce { 
-                    F1DriversState.Error(
-                        message = throwable.message ?: "Unknown error occurred",
-                        drivers = getCurrentDrivers(),
-                        searchQuery = getCurrentSearchQuery(),
-                        filteredDrivers = getCurrentFilteredDrivers(),
-                        selectedSessionKey = sessionKey
-                    )
-                }
-                postSideEffect(F1DriversSideEffect.ShowToast(throwable.message ?: "Failed to load session drivers"))
-            }
-            .collect { result ->
-                when (result) {
-                    is ApiResult.Loading -> {
-                        reduce { 
-                            F1DriversState.Loading(
-                                drivers = getCurrentDrivers(),
-                                searchQuery = getCurrentSearchQuery(),
-                                filteredDrivers = getCurrentFilteredDrivers(),
-                                selectedSessionKey = sessionKey
-                            )
-                        }
-                    }
-                    is ApiResult.Success -> {
-                        val currentQuery = getCurrentSearchQuery()
-                        val filteredDrivers = filterDrivers(result.data, currentQuery)
-                        reduce { 
-                            F1DriversState.Success(
-                                drivers = result.data,
-                                searchQuery = currentQuery,
-                                filteredDrivers = filteredDrivers,
-                                selectedSessionKey = sessionKey
-                            )
-                        }
-                    }
-                    is ApiResult.Error -> {
-                        reduce { 
-                            F1DriversState.Error(
-                                message = result.message,
-                                drivers = getCurrentDrivers(),
-                                searchQuery = getCurrentSearchQuery(),
-                                filteredDrivers = getCurrentFilteredDrivers(),
-                                selectedSessionKey = sessionKey
                             )
                         }
                         postSideEffect(F1DriversSideEffect.ShowToast(result.message))
@@ -175,53 +104,27 @@ class F1DriversViewModel(
     }
 
     fun onRefresh() = intent {
-        val sessionKey = getCurrentSessionKey()
-        if (sessionKey != null) {
-            loadDriversForSession(sessionKey)
-        } else {
-            loadDrivers()
-        }
-    }
-
-    fun onSearchQueryChanged(query: String) = intent {
-        val drivers = getCurrentDrivers()
-        val filteredDrivers = filterDrivers(drivers, query)
-        reduce { 
-            when (val currentState = state) {
-                is F1DriversState.Loading -> currentState.copy(searchQuery = query, filteredDrivers = filteredDrivers)
-                is F1DriversState.Success -> currentState.copy(searchQuery = query, filteredDrivers = filteredDrivers)
-                is F1DriversState.Error -> currentState.copy(searchQuery = query, filteredDrivers = filteredDrivers)
-                is F1DriversState.Idle -> currentState.copy(searchQuery = query, filteredDrivers = filteredDrivers)
-            }
-        }
+        loadDrivers()
     }
 
     fun onDriverClick(driverNumber: Int) = intent {
         postSideEffect(F1DriversSideEffect.NavigateToDriverDetail(driverNumber))
     }
 
-    fun onViewStandingsClick() = intent {
-        getCurrentSessionKey()?.let { sessionKey ->
-            postSideEffect(F1DriversSideEffect.NavigateToDriverStandings(sessionKey))
-        }
+    fun onDriverStandingsClick(sessionKey: Int) = intent {
+        postSideEffect(F1DriversSideEffect.NavigateToDriverStandings(sessionKey))
     }
 
-    fun onClearError() = intent {
-        reduce { 
-            when (val currentState = state) {
-                is F1DriversState.Error -> F1DriversState.Success(
-                    drivers = currentState.drivers,
-                    searchQuery = currentState.searchQuery,
-                    filteredDrivers = currentState.filteredDrivers,
-                    selectedSessionKey = currentState.selectedSessionKey
-                )
-                else -> currentState
+    private fun filterDrivers(drivers: List<F1Driver>, query: String): List<F1Driver> {
+        return if (query.isBlank()) {
+            drivers
+        } else {
+            drivers.filter { driver ->
+                driver.fullName.contains(query, ignoreCase = true) ||
+                        driver.teamName.contains(query, ignoreCase = true) ||
+                        driver.nameAcronym.contains(query, ignoreCase = true)
             }
         }
-    }
-
-    fun onRetry() = intent {
-        onRefresh()
     }
 
     private fun getCurrentDrivers(): List<F1Driver> {
@@ -257,18 +160,6 @@ class F1DriversViewModel(
             is F1DriversState.Success -> currentState.selectedSessionKey
             is F1DriversState.Error -> currentState.selectedSessionKey
             is F1DriversState.Idle -> currentState.selectedSessionKey
-        }
-    }
-
-    private fun filterDrivers(drivers: List<F1Driver>, query: String): List<F1Driver> {
-        if (query.isBlank()) return drivers
-        
-        val lowerQuery = query.lowercase()
-        return drivers.filter { driver ->
-            driver.fullName.lowercase().contains(lowerQuery) ||
-            driver.nameAcronym.lowercase().contains(lowerQuery) ||
-            driver.teamName.lowercase().contains(lowerQuery) ||
-            driver.driverNumber.toString().contains(query)
         }
     }
 }

@@ -113,9 +113,18 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:3000/v1\"")
+            buildConfigField("boolean", "USE_MOCK_SERVER", "true")
+        }
         getByName("release") {
             isMinifyEnabled = false
+            buildConfigField("String", "API_BASE_URL", "\"https://api.openf1.org/v1\"")
+            buildConfigField("boolean", "USE_MOCK_SERVER", "false")
         }
+    }
+    buildFeatures {
+        buildConfig = true
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

@@ -1,13 +1,9 @@
 package com.jskinner.f1dash.presentation.viewmodels
 
-import androidx.lifecycle.ViewModel
 import com.jskinner.f1dash.data.models.ApiResult
 import com.jskinner.f1dash.domain.models.F1RaceData
 import com.jskinner.f1dash.domain.repository.F1Repository
 import kotlinx.coroutines.flow.catch
-import org.orbitmvi.orbit.Container
-import org.orbitmvi.orbit.ContainerHost
-import org.orbitmvi.orbit.viewmodel.container
 
 sealed interface F1RaceState {
     data class Loading(
@@ -33,10 +29,7 @@ sealed interface F1RaceSideEffect {
 
 class F1RaceViewModel(
     private val f1Repository: F1Repository
-) : ViewModel(), ContainerHost<F1RaceState, F1RaceSideEffect> {
-
-    override val container: Container<F1RaceState, F1RaceSideEffect> =
-        container(F1RaceState.Idle)
+) : BaseViewModel<F1RaceState, F1RaceSideEffect>(F1RaceState.Idle) {
 
     init {
         loadRaceData()

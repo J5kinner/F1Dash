@@ -13,5 +13,6 @@ interface F1Repository {
     suspend fun getLatestRaceSession(): Flow<ApiResult<F1Session>>
     suspend fun getRaceData(sessionKey: Int): Flow<ApiResult<F1RaceData>>
     suspend fun getLatestRaceData(): Flow<ApiResult<F1RaceData>>
-    suspend fun getWeather(sessionKey: Int): Flow<ApiResult<F1Weather>>
+
+    suspend fun getRaceReplay(sessionKey: Int): Flow<ApiResult<F1RaceReplay>>
 }
