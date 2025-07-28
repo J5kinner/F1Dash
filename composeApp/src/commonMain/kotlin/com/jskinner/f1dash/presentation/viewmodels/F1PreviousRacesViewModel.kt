@@ -3,116 +3,109 @@ package com.jskinner.f1dash.presentation.viewmodels
 import com.jskinner.f1dash.data.models.ApiResult
 import com.jskinner.f1dash.domain.models.F1Session
 import com.jskinner.f1dash.domain.repository.F1Repository
-import kotlinx.coroutines.flow.catch
+import org.orbitmvi.orbit.annotation.OrbitExperimental
+import org.orbitmvi.orbit.viewmodel.container
 
 sealed interface F1PreviousRacesState {
-    data class Loading(
-        val races: List<F1Session> = emptyList()
-    ) : F1PreviousRacesState
-
-    data class Success(
-        val races: List<F1Session>
-    ) : F1PreviousRacesState
-
-    data class Error(
-        val message: String,
-        val races: List<F1Session> = emptyList()
-    ) : F1PreviousRacesState
-
-    data class Idle(
-        val races: List<F1Session> = emptyList()
+    data object Loading : F1PreviousRacesState
+    data class Error(val isRefreshing: Boolean = false) : F1PreviousRacesState
+    data class Content(
+        val races: List<F1Session>,
+        val selectedYear: Int = 2025,
+        val isRefreshing: Boolean = false
     ) : F1PreviousRacesState
 }
 
-sealed interface F1PreviousRacesSideEffect {
-    data class ShowToast(val message: String) : F1PreviousRacesSideEffect
-    data class NavigateToRaceResults(val sessionKey: Int) : F1PreviousRacesSideEffect
-    data class NavigateToReplay(val sessionKey: Int) : F1PreviousRacesSideEffect
+sealed class F1PreviousRacesSideEffect {
+    data class ShowToast(val message: String) : F1PreviousRacesSideEffect()
+    data class NavigateToRaceResults(val sessionKey: Int) : F1PreviousRacesSideEffect()
+    data class NavigateToReplay(val sessionKey: Int) : F1PreviousRacesSideEffect()
+    data object UnableToFetchError : F1PreviousRacesSideEffect()
+    data object RefreshError : F1PreviousRacesSideEffect()
 }
 
+@OptIn(OrbitExperimental::class)
 class F1PreviousRacesViewModel(
     private val f1Repository: F1Repository
-) : BaseViewModel<F1PreviousRacesState, F1PreviousRacesSideEffect>(F1PreviousRacesState.Idle()) {
+) : BaseViewModel<F1PreviousRacesState, F1PreviousRacesSideEffect>() {
 
-    init {
-        loadRaces()
+    override val container = container<F1PreviousRacesState, F1PreviousRacesSideEffect>(F1PreviousRacesState.Loading) {
+        onLoad()
     }
 
-    fun loadRaces() = intent {
-        f1Repository.getSessions(year = 2025)
-            .catch { throwable ->
-                reduce {
-                    F1PreviousRacesState.Error(
-                        message = throwable.message ?: "Unknown error occurred",
-                        races = getCurrentRaces()
-                    )
+    private fun onLoad() = intent {
+        reduce { F1PreviousRacesState.Loading }
+        loadRaces(2025)
+    }
+
+    fun loadRaces(year: Int, forceRefresh: Boolean = false) = intent {
+        if (!forceRefresh) {
+            reduce { F1PreviousRacesState.Loading }
+        } else {
+            reduce {
+                when (val currentState = state) {
+                    is F1PreviousRacesState.Content -> currentState.copy(isRefreshing = true)
+                    else -> F1PreviousRacesState.Loading
                 }
-                postSideEffect(F1PreviousRacesSideEffect.ShowToast(throwable.message ?: "Failed to load races"))
             }
-            .collect { result ->
+        }
+
+        runCatching {
+            f1Repository.getSessions(year).collect { result ->
                 when (result) {
                     is ApiResult.Loading -> {
-                        reduce {
-                            F1PreviousRacesState.Loading(
-                                races = getCurrentRaces()
-                            )
-                        }
+                        // Keep current state during refresh
                     }
-
                     is ApiResult.Success -> {
-                        // Debug: Log the raw data to see what we're getting
-                        println("DEBUG: Raw sessions data count: ${result.data.size}")
-                        result.data.take(5).forEach { session ->
-                            println("DEBUG: Session - circuitName: '${session.circuitName}', location: '${session.location}', countryName: '${session.countryName}', sessionType: '${session.sessionType}', meetingKey: ${session.meetingKey}")
+                        val racesSessions = result.data.filter {
+                            it.sessionName.contains("Race", ignoreCase = true) ||
+                                    it.sessionType.contains("Race", ignoreCase = true)
                         }
-
-                        // Filter for race sessions, remove duplicates by meeting key, and sort by date
-                        val raceSessions = result.data
-                            .filter { it.sessionType == "Race" }
-                            .distinctBy { it.meetingKey } // Remove duplicates by meeting key
-                            .sortedBy { it.dateStart }
-
-                        println("DEBUG: Filtered race sessions count: ${raceSessions.size}")
-                        raceSessions.take(5).forEach { session ->
-                            println("DEBUG: Race - circuitName: '${session.circuitName}', location: '${session.location}', countryName: '${session.countryName}', dateStart: '${session.dateStart}', meetingKey: ${session.meetingKey}")
-                        }
+                            .sortedByDescending { it.dateStart }
 
                         reduce {
-                            F1PreviousRacesState.Success(races = raceSessions)
-                        }
-                    }
-
-                    is ApiResult.Error -> {
-                        reduce {
-                            F1PreviousRacesState.Error(
-                                message = result.message,
-                                races = getCurrentRaces()
+                            F1PreviousRacesState.Content(
+                                races = racesSessions,
+                                selectedYear = year,
+                                isRefreshing = false
                             )
                         }
-                        postSideEffect(F1PreviousRacesSideEffect.ShowToast(result.message))
+                    }
+                    is ApiResult.Error -> {
+                        reduce { F1PreviousRacesState.Error(isRefreshing = false) }
+                        postSideEffect(F1PreviousRacesSideEffect.UnableToFetchError)
                     }
                 }
             }
+        }.onFailure { error ->
+            handleError(error)
+            reduce { F1PreviousRacesState.Error(isRefreshing = false) }
+            postSideEffect(F1PreviousRacesSideEffect.UnableToFetchError)
+        }
     }
 
     fun onRefresh() = intent {
-        loadRaces()
-    }
-
-    fun onRaceClick(race: F1Session) = intent {
-        postSideEffect(F1PreviousRacesSideEffect.NavigateToRaceResults(race.sessionKey))
-    }
-
-    fun onReplayClick(race: F1Session) = intent {
-        postSideEffect(F1PreviousRacesSideEffect.NavigateToReplay(race.sessionKey))
-    }
-
-    private fun getCurrentRaces(): List<F1Session> {
-        return when (val currentState = container.stateFlow.value) {
-            is F1PreviousRacesState.Loading -> currentState.races
-            is F1PreviousRacesState.Success -> currentState.races
-            is F1PreviousRacesState.Error -> currentState.races
-            is F1PreviousRacesState.Idle -> currentState.races
+        val currentYear = when (val currentState = state) {
+            is F1PreviousRacesState.Content -> currentState.selectedYear
+            else -> 2025
         }
+        loadRaces(currentYear, forceRefresh = true)
     }
-} 
+
+    fun onYearSelected(year: Int) = intent {
+        loadRaces(year)
+    }
+
+    fun onRaceClick(sessionKey: Int) = intent {
+        postSideEffect(F1PreviousRacesSideEffect.NavigateToRaceResults(sessionKey))
+    }
+
+    fun onReplayClick(sessionKey: Int) = intent {
+        postSideEffect(F1PreviousRacesSideEffect.NavigateToReplay(sessionKey))
+    }
+
+    private fun handleError(error: Throwable) = intent {
+        // Log error for debugging (implement logging as needed)
+        // Consider global error handling for common scenarios
+    }
+}

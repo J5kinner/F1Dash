@@ -7,11 +7,24 @@ class IosApiConfig : ApiConfig {
         true  // TODO: Implement proper debug/release detection for iOS
     }
 
-    override val baseUrl: String = if (isDebugMode) {
-        "http://localhost:3000/v1"  // Mock server for iOS simulator
-    } else {
-        "https://api.openf1.org/v1"  // Real OpenF1 API for release
+    override val baseUrl: String by lazy {
+        if (isDebugMode) {
+            try {
+                IosEmbeddedServerManager.getBaseUrl()
+            } catch (e: Exception) {
+                println("Failed to start embedded server: ${e.message}")
+                "http://localhost:3000/v1"  // Fallback to external server
+            }
+        } else {
+            "https://api.openf1.org/v1"  // Real OpenF1 API for release
+        }
     }
+}
+
+object IosEmbeddedServerManager {
+    private val server by lazy { com.jskinner.f1dash.server.EmbeddedMockServer() }
+
+    fun getBaseUrl(): String = server.start()
 }
 
 actual fun getApiConfig(): ApiConfig = IosApiConfig()

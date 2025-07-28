@@ -489,16 +489,56 @@ object MockDataGenerator {
             drivers.take(10)
         }
 
-        return selectedDrivers.mapIndexed { index, driver ->
-            OpenF1IntervalResponse(
-                date = "2024-12-08T15:30:00.000Z",
-                driverNumber = driver.driverNumber,
-                gap = if (index == 0) 0.0 else (index * 5.0) + Random.nextDouble(-2.0, 2.0),
-                interval = if (index == 0) null else Random.nextDouble(2.0, 8.0),
-                meetingKey = 1234,
-                sessionKey = sessionKey
-            )
+        val intervals = mutableListOf<OpenF1IntervalResponse>()
+
+        // Generate realistic intervals with some drivers multiple laps down
+        val racePositions = listOf(
+            Pair(1, "0.0"),      // Leader
+            Pair(81, "1.234"),   // Close behind
+            Pair(4, "3.891"),    // Fighting for podium
+            Pair(16, "12.456"),  // Comfortable 4th
+            Pair(55, "18.723"),  // Mid-field battle
+            Pair(63, "25.134"),  // Mercedes struggling
+            Pair(44, "31.892"),  // Hamilton behind Russell
+            Pair(11, "47.234"),  // Perez having issues
+            Pair(14, "+1 LAP"),  // Alonso 1 lap down
+            Pair(18, "+2 LAPS")  // Stroll 2 laps down (mechanical issues)
+        )
+
+        racePositions.forEachIndexed { index, (driverNum, gapValue) ->
+            val driver = selectedDrivers.find { it.driverNumber == driverNum }
+            if (driver != null) {
+                val intervalValue = when {
+                    index == 0 -> null // Leader has no interval
+                    gapValue.contains("LAP") -> gapValue // Lapped cars
+                    index == 1 -> gapValue // Second place shows gap to leader
+                    else -> {
+                        // Calculate interval to car ahead
+                        val previousGap = racePositions[index - 1].second
+                        if (previousGap.contains("LAP")) {
+                            gapValue
+                        } else {
+                            val currentGap = gapValue.toDoubleOrNull() ?: 0.0
+                            val prevGap = previousGap.toDoubleOrNull() ?: 0.0
+                            String.format("%.3f", currentGap - prevGap)
+                        }
+                    }
+                }
+
+                intervals.add(
+                    OpenF1IntervalResponse(
+                        date = "2025-03-16T15:45:${(index * 3).toString().padStart(2, '0')}.000Z",
+                        driverNumber = driverNum,
+                        gap = if (index == 0) null else gapValue,
+                        interval = intervalValue,
+                        meetingKey = 1250,
+                        sessionKey = sessionKey
+                    )
+                )
+            }
         }
+
+        return intervals
     }
 
     fun generateStints(sessionKey: Int, driverNumber: Int? = null): List<OpenF1StintResponse> {

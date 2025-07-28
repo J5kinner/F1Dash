@@ -37,6 +37,8 @@ fun RaceResultsScreen(
         when (sideEffect) {
             is F1RaceSideEffect.ShowToast -> onShowToast(sideEffect.message)
             is F1RaceSideEffect.NavigateToDriverDetail -> onNavigateToDriverDetail(sideEffect.driverNumber)
+            F1RaceSideEffect.UnableToFetchError -> onShowToast("Unable to fetch race data")
+            F1RaceSideEffect.RefreshError -> onShowToast("Failed to refresh data")
         }
     }
 
@@ -61,42 +63,27 @@ fun RaceResultsScreen(
     ) { paddingValues ->
         when (val currentState = state) {
             is F1RaceState.Loading -> {
-                if (currentState.raceData == null) {
-                    LoadingContent()
-                } else {
-                    RaceContent(
-                        raceData = currentState.raceData,
-                        onDriverClick = viewModel::onDriverClick,
-                        modifier = Modifier.padding(paddingValues)
-                    )
-                }
+                LoadingContent()
             }
             
             is F1RaceState.Error -> {
-                if (currentState.raceData == null) {
-                    ErrorContent(
-                        error = currentState.message,
-                        onRetry = viewModel::onRefresh
-                    )
-                } else {
+                ErrorContent(
+                    error = "Unable to load race data",
+                    onRetry = viewModel::onRefresh
+                )
+            }
+
+            is F1RaceState.Content -> {
+                PullRefreshContent(
+                    isRefreshing = currentState.isRefreshing,
+                    onRefresh = viewModel::onRefresh
+                ) {
                     RaceContent(
                         raceData = currentState.raceData,
                         onDriverClick = viewModel::onDriverClick,
                         modifier = Modifier.padding(paddingValues)
                     )
                 }
-            }
-            
-            is F1RaceState.Success -> {
-                RaceContent(
-                    raceData = currentState.raceData,
-                    onDriverClick = viewModel::onDriverClick,
-                    modifier = Modifier.padding(paddingValues)
-                )
-            }
-            
-            is F1RaceState.Idle -> {
-                LoadingContent()
             }
         }
     }
@@ -224,5 +211,21 @@ private fun RaceStatistics(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PullRefreshContent(
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Column {
+        if (isRefreshing) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        content()
     }
 }

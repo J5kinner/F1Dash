@@ -36,7 +36,7 @@ fun Application.configureF1Routes() {
             }
 
             get("/laps") {
-                val sessionKey = call.parameters["session_key"]?.toIntOrNull() ?: 9250
+                val sessionKey = call.parameters["session_key"]?.toIntOrNull() ?: 9934
                 val driverNumber = call.parameters["driver_number"]?.toIntOrNull()
                 val lapNumber = call.parameters["lap_number"]?.toIntOrNull()
 
@@ -45,7 +45,7 @@ fun Application.configureF1Routes() {
             }
 
             get("/intervals") {
-                val sessionKey = call.parameters["session_key"]?.toIntOrNull() ?: 9250
+                val sessionKey = call.parameters["session_key"]?.toIntOrNull() ?: 9934
                 val driverNumber = call.parameters["driver_number"]?.toIntOrNull()
 
                 val intervals = MockDataGenerator.generateIntervals(sessionKey, driverNumber)

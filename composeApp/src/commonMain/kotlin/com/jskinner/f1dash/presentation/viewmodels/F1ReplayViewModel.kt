@@ -1,12 +1,16 @@
 package com.jskinner.f1dash.presentation.viewmodels
 
-import com.jskinner.f1dash.domain.models.*
-import com.jskinner.f1dash.domain.repository.F1Repository
+import androidx.lifecycle.viewModelScope
 import com.jskinner.f1dash.data.models.ApiResult
+import com.jskinner.f1dash.domain.models.F1Driver
+import com.jskinner.f1dash.domain.models.F1RaceReplay
+import com.jskinner.f1dash.domain.models.F1ReplayFrame
+import com.jskinner.f1dash.domain.models.F1ReplayState
+import com.jskinner.f1dash.domain.repository.F1Repository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import androidx.lifecycle.viewModelScope
+import org.orbitmvi.orbit.viewmodel.container
 
 sealed interface F1ReplayScreenState {
     data object Loading : F1ReplayScreenState
@@ -27,7 +31,9 @@ sealed interface F1ReplaySideEffect {
 
 class F1ReplayViewModel(
     private val f1Repository: F1Repository
-) : BaseViewModel<F1ReplayScreenState, F1ReplaySideEffect>(F1ReplayScreenState.Loading) {
+) : BaseViewModel<F1ReplayScreenState, F1ReplaySideEffect>() {
+
+    override val container = container<F1ReplayScreenState, F1ReplaySideEffect>(F1ReplayScreenState.Loading)
 
     private var playbackJob: Job? = null
     private var currentSessionKey: Int = 0
@@ -91,162 +97,6 @@ class F1ReplayViewModel(
         }
     }
 
-    @Deprecated("Use real API data instead")
-    private fun createMockRaceReplay() = intent {
-        // Create a mock race replay for testing
-        val mockSession = F1Session(
-            sessionKey = 123456,
-            meetingKey = 123,
-            sessionName = "Belgian Grand Prix",
-            sessionType = "Race",
-            dateStart = "2024-07-28T15:00:00",
-            dateEnd = "2024-07-28T17:00:00",
-            location = "Spa-Francorchamps",
-            countryName = "Belgium",
-            countryCode = "BEL",
-            circuitName = "Circuit de Spa-Francorchamps",
-            circuitShortName = "Spa",
-            year = 2024
-        )
-
-        val mockDrivers = createDriverMap()
-
-        val mockFrames = (1..20).map { lapNumber ->
-            F1ReplayFrame(
-                lapNumber = lapNumber,
-                elapsedTime = lapNumber * 120.0, // 2 minutes per lap
-                driverPositions = mockDrivers.keys.take(10).mapIndexed { index, driverNumber ->
-                    F1DriverPosition(
-                        driverNumber = driverNumber,
-                        position = index + 1,
-                        gap = if (index == 0) "Leader" else "+${index * 2.5}s",
-                        lapTime = "${1 + (index * 0.1)}:${30 + (index * 2)}.${100 + (index * 10)}",
-                        tyre = listOf("SOFT", "MEDIUM", "HARD")[index % 3],
-                        pitStops = index / 5
-                    )
-                }
-            )
-        }
-
-        val mockRaceReplay = F1RaceReplay(
-            session = mockSession,
-            frames = mockFrames,
-            totalLaps = 20,
-            raceDuration = 2400.0, // 40 minutes
-            drivers = mockDrivers
-        )
-
-        val replayState = F1ReplayState(
-            isPlaying = false,
-            currentFrameIndex = 0,
-            playbackSpeed = 1.0f,
-            totalFrames = mockFrames.size
-        )
-
-        val currentFrame = mockFrames.first()
-
-        reduce {
-            F1ReplayScreenState.Ready(
-                raceReplay = mockRaceReplay,
-                replayState = replayState,
-                currentFrame = currentFrame,
-                drivers = mockDrivers
-            )
-        }
-    }
-
-    private fun createDriverMap(): Map<Int, F1Driver> {
-        val driverNames = mapOf(
-            1 to "Max Verstappen",
-            2 to "Logan Sargeant",
-            3 to "Daniel Ricciardo",
-            4 to "Lando Norris",
-            5 to "Sebastian Vettel",
-            6 to "Nicholas Latifi",
-            7 to "Lewis Hamilton",
-            8 to "Valtteri Bottas",
-            9 to "Carlos Sainz",
-            10 to "Pierre Gasly",
-            11 to "Sergio Pérez",
-            12 to "Esteban Ocon",
-            14 to "Fernando Alonso",
-            16 to "Charles Leclerc",
-            18 to "Lance Stroll",
-            20 to "Kevin Magnussen",
-            22 to "Yuki Tsunoda",
-            23 to "Alexander Albon",
-            24 to "Zhou Guanyu",
-            27 to "Nico Hulkenberg",
-            31 to "Esteban Ocon",
-            44 to "Lewis Hamilton",
-            55 to "Carlos Sainz",
-            63 to "George Russell",
-            77 to "Valtteri Bottas",
-            81 to "Oscar Piastri"
-        )
-
-        val teamNames = mapOf(
-            1 to "Red Bull Racing",
-            2 to "Williams",
-            3 to "AlphaTauri",
-            4 to "McLaren",
-            5 to "Aston Martin",
-            6 to "Williams",
-            7 to "Mercedes",
-            8 to "Alfa Romeo",
-            9 to "Ferrari",
-            10 to "Alpine",
-            11 to "Red Bull Racing",
-            12 to "Alpine",
-            14 to "Aston Martin",
-            16 to "Ferrari",
-            18 to "Aston Martin",
-            20 to "Haas F1 Team",
-            22 to "AlphaTauri",
-            23 to "Williams",
-            24 to "Alfa Romeo",
-            27 to "Haas F1 Team",
-            31 to "Alpine",
-            44 to "Mercedes",
-            55 to "Ferrari",
-            63 to "Mercedes",
-            77 to "Alfa Romeo",
-            81 to "McLaren"
-        )
-
-        val teamColors = mapOf(
-            "Red Bull Racing" to "3671C6",
-            "Williams" to "37BEDD",
-            "AlphaTauri" to "5E8FAA",
-            "McLaren" to "FF8700",
-            "Aston Martin" to "229971",
-            "Mercedes" to "6CD3BF",
-            "Alfa Romeo" to "C92D4B",
-            "Ferrari" to "F91536",
-            "Alpine" to "229971",
-            "Haas F1 Team" to "B6BAAB"
-        )
-
-        return (1..10).associateWith { driverNumber ->
-            val fullName = driverNames[driverNumber] ?: "Driver $driverNumber"
-            val teamName = teamNames[driverNumber] ?: "Unknown Team"
-            val teamColor = teamColors[teamName] ?: "808080"
-
-            F1Driver(
-                driverNumber = driverNumber,
-                fullName = fullName,
-                firstName = fullName.split(" ").firstOrNull() ?: "Driver",
-                lastName = fullName.split(" ").lastOrNull() ?: driverNumber.toString(),
-                nameAcronym = fullName.split(" ").map { it.first() }.joinToString(""),
-                teamName = teamName,
-                teamColour = teamColor,
-                headshotUrl = null,
-                countryCode = "XX",
-                broadcastName = fullName
-            )
-        }
-    }
-
     fun togglePlayback() = intent {
         val currentState = container.stateFlow.value
         if (currentState is F1ReplayScreenState.Ready) {
@@ -300,36 +150,42 @@ class F1ReplayViewModel(
     }
 
     private fun startPlayback() {
-        playbackJob?.cancel()
+        stopPlayback()
         playbackJob = viewModelScope.launch {
             while (true) {
-                val currentState = container.stateFlow.value as? F1ReplayScreenState.Ready ?: break
-
-                if (!currentState.replayState.isPlaying) break
-
-                val nextFrameIndex = currentState.replayState.currentFrameIndex + 1
-                if (nextFrameIndex >= currentState.raceReplay.frames.size) {
-                    intent {
-                        reduce {
-                            currentState.copy(
-                                replayState = currentState.replayState.copy(isPlaying = false)
-                            )
-                        }
-                    }
+                val currentState = container.stateFlow.value as? F1ReplayScreenState.Ready
+                if (currentState == null || !currentState.replayState.isPlaying) {
                     break
                 }
 
-                val nextFrame = currentState.raceReplay.frames[nextFrameIndex]
+                delay((1000 / currentState.replayState.playbackSpeed).toLong())
+
                 intent {
+                    val latestState = container.stateFlow.value as? F1ReplayScreenState.Ready ?: return@intent
+
+                    if (!latestState.replayState.isPlaying) {
+                        return@intent
+                    }
+
+                    val nextFrameIndex = latestState.replayState.currentFrameIndex + 1
+                    if (nextFrameIndex >= latestState.raceReplay.frames.size) {
+                        reduce {
+                            latestState.copy(
+                                replayState = latestState.replayState.copy(isPlaying = false)
+                            )
+                        }
+                        return@intent
+                    }
+
+                    val nextFrame = latestState.raceReplay.frames[nextFrameIndex]
+                    
                     reduce {
-                        currentState.copy(
-                            replayState = currentState.replayState.copy(currentFrameIndex = nextFrameIndex),
+                        latestState.copy(
+                            replayState = latestState.replayState.copy(currentFrameIndex = nextFrameIndex),
                             currentFrame = nextFrame
                         )
                     }
                 }
-
-                delay((1000 / currentState.replayState.playbackSpeed).toLong())
             }
         }
     }
