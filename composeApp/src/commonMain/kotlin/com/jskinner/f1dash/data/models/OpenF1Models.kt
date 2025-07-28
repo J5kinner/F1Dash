@@ -14,7 +14,7 @@ data class OpenF1PositionResponse(
 
 @Serializable
 data class OpenF1LapResponse(
-    @SerialName("date_start") val dateStart: String,
+    @SerialName("date_start") val dateStart: String?,
     @SerialName("driver_number") val driverNumber: Int,
     @SerialName("duration_sector_1") val durationSector1: Double?,
     @SerialName("duration_sector_2") val durationSector2: Double?,
@@ -33,8 +33,8 @@ data class OpenF1LapResponse(
 data class OpenF1IntervalResponse(
     val date: String,
     @SerialName("driver_number") val driverNumber: Int,
-    val gap: Double?,
-    val interval: Double?,
+    val gap: String?,
+    val interval: String?,
     @SerialName("meeting_key") val meetingKey: Int,
     @SerialName("session_key") val sessionKey: Int
 )
@@ -44,7 +44,7 @@ data class OpenF1StintResponse(
     @SerialName("compound") val compound: String,
     @SerialName("driver_number") val driverNumber: Int,
     @SerialName("lap_end") val lapEnd: Int?,
-    @SerialName("lap_start") val lapStart: Int,
+    @SerialName("lap_start") val lapStart: Int?,
     @SerialName("meeting_key") val meetingKey: Int,
     @SerialName("session_key") val sessionKey: Int,
     @SerialName("stint_number") val stintNumber: Int,
@@ -55,7 +55,7 @@ data class OpenF1StintResponse(
 data class OpenF1PitResponse(
     val date: String,
     @SerialName("driver_number") val driverNumber: Int,
-    val duration: Double,
+    val duration: Double?,
     @SerialName("lap_number") val lapNumber: Int,
     @SerialName("meeting_key") val meetingKey: Int,
     @SerialName("pit_duration") val pitDuration: Double?,

@@ -3,19 +3,26 @@ package com.jskinner.f1dash.data.repository
 import com.jskinner.f1dash.data.api.F1DriverApi
 import com.jskinner.f1dash.data.api.F1SessionApi
 import com.jskinner.f1dash.data.api.OpenF1Api
+import com.jskinner.f1dash.data.cache.ResponseCache
 import com.jskinner.f1dash.data.models.ApiResult
 import com.jskinner.f1dash.data.transformers.OpenF1DataTransformer
 import com.jskinner.f1dash.domain.models.*
 import com.jskinner.f1dash.domain.repository.F1Repository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
-class F1RepositoryImpl(
+class CachedF1RepositoryImpl(
     private val f1DriverApi: F1DriverApi,
     private val f1SessionApi: F1SessionApi,
-    private val openF1Api: OpenF1Api
+    private val openF1Api: OpenF1Api,
+    private val raceDataCache: ResponseCache<F1RaceData>
 ) : BaseRepository(), F1Repository {
 
     private val raceDataFetcher = RaceDataFetcher(f1DriverApi, f1SessionApi)
+
+    init {
+        raceDataCache.cacheTimeInSeconds = 300
+    }
 
     override suspend fun getDrivers(): Flow<ApiResult<List<F1Driver>>> =
         handleApiCallWithTransform(
@@ -59,15 +66,39 @@ class F1RepositoryImpl(
             transform = { session -> session.toDomainModel() }
         )
 
-    override suspend fun getRaceData(sessionKey: Int): Flow<ApiResult<F1RaceData>> =
-        handleApiCall(
-            apiCall = { raceDataFetcher.fetchRaceData(sessionKey) }
-        )
+    override suspend fun getRaceData(sessionKey: Int): Flow<ApiResult<F1RaceData>> = flow {
+        emit(ApiResult.Loading)
 
-    override suspend fun getLatestRaceData(forceRefresh: Boolean): Flow<ApiResult<F1RaceData>> =
-        handleApiCall(
-            apiCall = { raceDataFetcher.fetchLatestRaceData() }
-        )
+        val result = raceDataCache.fetchResponse(
+            key = "race_data_$sessionKey",
+            forceRefresh = false
+        ) {
+            fetchRaceDataFromApi(sessionKey)
+        }
+
+        emit(result)
+    }
+
+    override suspend fun getLatestRaceData(forceRefresh: Boolean): Flow<ApiResult<F1RaceData>> = flow {
+        emit(ApiResult.Loading)
+
+        val result = raceDataCache.fetchResponse(
+            key = "latest_race_data",
+            forceRefresh = forceRefresh
+        ) {
+            fetchLatestRaceDataFromApi()
+        }
+
+        emit(result)
+    }
+
+    private suspend fun fetchRaceDataFromApi(sessionKey: Int): ApiResult<F1RaceData> {
+        return raceDataFetcher.fetchRaceData(sessionKey)
+    }
+
+    private suspend fun fetchLatestRaceDataFromApi(): ApiResult<F1RaceData> {
+        return raceDataFetcher.fetchLatestRaceData()
+    }
 
     override suspend fun getRaceReplay(sessionKey: Int): Flow<ApiResult<F1RaceReplay>> =
         handleApiCall(

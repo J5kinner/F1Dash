@@ -87,48 +87,9 @@ object OpenF1DataTransformer {
         openF1Data: OpenF1RaceReplayData,
         drivers: Map<Int, F1Driver>
     ): F1ReplayFrame {
-        val driverPositions = mutableListOf<F1DriverPosition>()
-
-        // Get all driver numbers from this lap's data
         val lapsAtThisNumber = openF1Data.laps.filter { it.lapNumber == lapNumber }
-        val driverNumbers = if (lapsAtThisNumber.isNotEmpty()) {
-            lapsAtThisNumber.map { it.driverNumber }.distinct()
-        } else {
-            drivers.keys.toList()
-        }
-
-        for (driverNumber in driverNumbers) {
-            val mostRecentPosition = findMostRecentPositionForLap(driverNumber, lapNumber, openF1Data.positions)
-            val lapData = lapsAtThisNumber.find { it.driverNumber == driverNumber }
-            val intervalData = findMostRecentIntervalForLap(driverNumber, lapNumber, openF1Data.intervals)
-            val currentStint = findCurrentStint(driverNumber, lapNumber, openF1Data.stints)
-            val pitStops = countPitStopsUpToLap(driverNumber, lapNumber, openF1Data.pitStops)
-
-            // Skip if we don't have position data for this driver
-            val position = mostRecentPosition?.position ?: continue
-
-            val gap = formatGap(intervalData?.gap, intervalData?.interval)
-
-            // Show the actual lap time for this specific lap, or the most recent one
-            val lapTime = when {
-                lapData?.lapDuration != null -> formatLapTime(lapData.lapDuration)
-                else -> findMostRecentLapTime(driverNumber, lapNumber, openF1Data.laps)
-            }
-
-            val tyre = currentStint?.compound ?: "UNKNOWN"
-
-            driverPositions.add(
-                F1DriverPosition(
-                    driverNumber = driverNumber,
-                    position = position,
-                    gap = gap,
-                    lapTime = lapTime,
-                    tyre = tyre,
-                    pitStops = pitStops
-                )
-            )
-        }
-
+        val driverNumbers = getRelevantDriverNumbers(lapsAtThisNumber, drivers)
+        val driverPositions = buildDriverPositions(driverNumbers, lapNumber, lapsAtThisNumber, openF1Data)
         val elapsedTime = calculateElapsedTime(lapNumber, openF1Data.laps)
 
         return F1ReplayFrame(
@@ -136,6 +97,68 @@ object OpenF1DataTransformer {
             elapsedTime = elapsedTime,
             driverPositions = driverPositions.sortedBy { it.position }
         )
+    }
+
+    private fun getRelevantDriverNumbers(
+        lapsAtThisNumber: List<OpenF1LapResponse>,
+        drivers: Map<Int, F1Driver>
+    ): List<Int> {
+        return if (lapsAtThisNumber.isNotEmpty()) {
+            lapsAtThisNumber.map { it.driverNumber }.distinct()
+        } else {
+            drivers.keys.toList()
+        }
+    }
+
+    private fun buildDriverPositions(
+        driverNumbers: List<Int>,
+        lapNumber: Int,
+        lapsAtThisNumber: List<OpenF1LapResponse>,
+        openF1Data: OpenF1RaceReplayData
+    ): List<F1DriverPosition> {
+        return driverNumbers.mapNotNull { driverNumber ->
+            buildDriverPosition(driverNumber, lapNumber, lapsAtThisNumber, openF1Data)
+        }
+    }
+
+    private fun buildDriverPosition(
+        driverNumber: Int,
+        lapNumber: Int,
+        lapsAtThisNumber: List<OpenF1LapResponse>,
+        openF1Data: OpenF1RaceReplayData
+    ): F1DriverPosition? {
+        val mostRecentPosition = findMostRecentPositionForLap(driverNumber, lapNumber, openF1Data.positions)
+        val position = mostRecentPosition?.position ?: return null
+
+        val lapData = lapsAtThisNumber.find { it.driverNumber == driverNumber }
+        val intervalData = findMostRecentIntervalForLap(driverNumber, lapNumber, openF1Data.intervals)
+        val currentStint = findCurrentStint(driverNumber, lapNumber, openF1Data.stints)
+        val pitStops = countPitStopsUpToLap(driverNumber, lapNumber, openF1Data.pitStops)
+
+        val gap = formatGap(intervalData?.gap, intervalData?.interval)
+        val lapTime = getLapTimeForDriver(lapData, driverNumber, lapNumber, openF1Data.laps)
+        val tyre = currentStint?.compound ?: "UNKNOWN"
+
+        return F1DriverPosition(
+            driverNumber = driverNumber,
+            position = position,
+            gap = gap,
+            lapTime = lapTime,
+            tyre = tyre,
+            pitStops = pitStops
+        )
+    }
+
+    private fun getLapTimeForDriver(
+        lapData: OpenF1LapResponse?,
+        driverNumber: Int,
+        lapNumber: Int,
+        allLaps: List<OpenF1LapResponse>
+    ): String {
+        return when {
+            lapData?.lapDuration != null -> formatLapTime(lapData.lapDuration)
+            else -> findMostRecentLapTime(driverNumber, lapNumber, allLaps)
+        }
     }
 
     private fun findMostRecentPositionForLap(
@@ -167,7 +190,7 @@ object OpenF1DataTransformer {
     ): OpenF1StintResponse? {
         return stints
             .filter { it.driverNumber == driverNumber }
-            .filter { lapNumber >= it.lapStart }
+            .filter { it.lapStart != null && lapNumber >= it.lapStart }
             .filter { it.lapEnd == null || lapNumber <= it.lapEnd }
             .maxByOrNull { it.stintNumber }
     }
@@ -196,12 +219,17 @@ object OpenF1DataTransformer {
         return formatLapTime(recentLap?.lapDuration)
     }
 
-    private fun formatGap(gap: Double?, interval: Double?): String {
+    private fun formatGap(gap: String?, interval: String?): String {
         return when {
             gap == null && interval == null -> "+0.000"
-            gap != null && gap == 0.0 -> "0.000"
-            gap != null -> "+${(gap * 1000).toInt() / 1000.0}"
-            interval != null -> "+${(interval * 1000).toInt() / 1000.0}"
+            gap != null && gap == "0.0" -> "0.000"
+            gap != null -> {
+                if (gap.contains("LAP")) gap else "+$gap"
+            }
+
+            interval != null -> {
+                if (interval.contains("LAP")) interval else "+$interval"
+            }
             else -> "+0.000"
         }
     }
