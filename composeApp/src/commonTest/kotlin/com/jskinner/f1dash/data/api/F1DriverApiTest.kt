@@ -12,8 +12,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class F1ApiClientTest {
-    
+class F1DriverApiTest {
+
     private val mockDriversResponse = """
         [
             {
@@ -46,7 +46,7 @@ class F1ApiClientTest {
             }
         ]
     """.trimIndent()
-    
+
     private val singleDriverResponse = """
         [
             {
@@ -65,7 +65,7 @@ class F1ApiClientTest {
             }
         ]
     """.trimIndent()
-    
+
     private fun createMockHttpClient(response: String, statusCode: HttpStatusCode = HttpStatusCode.OK): HttpClient {
         return HttpClient(MockEngine) {
             engine {
@@ -85,21 +85,21 @@ class F1ApiClientTest {
             }
         }
     }
-    
+
     @Test
     fun `getDrivers returns success when API call succeeds`() = runTest {
         // Given
         val mockHttpClient = createMockHttpClient(mockDriversResponse)
-        val apiClient = F1ApiClient(mockHttpClient)
-        
+        val apiClient = F1DriverApi(mockHttpClient)
+
         // When
         val result = apiClient.getDrivers()
-        
+
         // Then
         assertTrue(result is ApiResult.Success)
         val drivers = result.data
         assertEquals(2, drivers.size)
-        
+
         val firstDriver = drivers[0]
         assertEquals(1234, firstDriver.meetingKey)
         assertEquals(5678, firstDriver.sessionKey)
@@ -114,21 +114,21 @@ class F1ApiClientTest {
         assertEquals("https://example.com/headshot.jpg", firstDriver.headshotUrl)
         assertEquals("NED", firstDriver.countryCode)
     }
-    
+
     @Test
     fun `getDrivers returns error when API call fails`() = runTest {
         // Given
         val mockHttpClient = createMockHttpClient("", HttpStatusCode.InternalServerError)
-        val apiClient = F1ApiClient(mockHttpClient)
-        
+        val apiClient = F1DriverApi(mockHttpClient)
+
         // When
         val result = apiClient.getDrivers()
-        
+
         // Then
         assertTrue(result is ApiResult.Error)
         assertTrue(result.message.isNotEmpty())
     }
-    
+
     @Test
     fun `getDriversForSession returns success with session parameter`() = runTest {
         // Given
@@ -138,7 +138,7 @@ class F1ApiClientTest {
                     // Verify session_key parameter is included
                     val sessionKey = request.url.parameters["session_key"]
                     assertEquals("5678", sessionKey)
-                    
+
                     respond(
                         content = mockDriversResponse,
                         status = HttpStatusCode.OK,
@@ -153,30 +153,30 @@ class F1ApiClientTest {
                 })
             }
         }
-        val apiClient = F1ApiClient(mockHttpClient)
-        
+        val apiClient = F1DriverApi(mockHttpClient)
+
         // When
         val result = apiClient.getDriversForSession(5678)
-        
+
         // Then
         assertTrue(result is ApiResult.Success)
         assertEquals(2, result.data.size)
     }
-    
+
     @Test
     fun `getDriversForSession returns error when API call fails`() = runTest {
         // Given
         val mockHttpClient = createMockHttpClient("", HttpStatusCode.BadRequest)
-        val apiClient = F1ApiClient(mockHttpClient)
-        
+        val apiClient = F1DriverApi(mockHttpClient)
+
         // When
         val result = apiClient.getDriversForSession(5678)
-        
+
         // Then
         assertTrue(result is ApiResult.Error)
         assertTrue(result.message.isNotEmpty())
     }
-    
+
     @Test
     fun `getDriverByNumber returns success when driver exists`() = runTest {
         // Given
@@ -186,7 +186,7 @@ class F1ApiClientTest {
                     // Verify driver_number parameter is included
                     val driverNumber = request.url.parameters["driver_number"]
                     assertEquals("1", driverNumber)
-                    
+
                     respond(
                         content = singleDriverResponse,
                         status = HttpStatusCode.OK,
@@ -201,18 +201,18 @@ class F1ApiClientTest {
                 })
             }
         }
-        val apiClient = F1ApiClient(mockHttpClient)
-        
+        val apiClient = F1DriverApi(mockHttpClient)
+
         // When
         val result = apiClient.getDriverByNumber(1)
-        
+
         // Then
         assertTrue(result is ApiResult.Success)
         val driver = result.data
         assertEquals(1, driver.driverNumber)
         assertEquals("Max Verstappen", driver.fullName)
     }
-    
+
     @Test
     fun `getDriverByNumber with sessionKey includes both parameters`() = runTest {
         // Given
@@ -224,7 +224,7 @@ class F1ApiClientTest {
                     val sessionKey = request.url.parameters["session_key"]
                     assertEquals("1", driverNumber)
                     assertEquals("5678", sessionKey)
-                    
+
                     respond(
                         content = singleDriverResponse,
                         status = HttpStatusCode.OK,
@@ -239,39 +239,39 @@ class F1ApiClientTest {
                 })
             }
         }
-        val apiClient = F1ApiClient(mockHttpClient)
-        
+        val apiClient = F1DriverApi(mockHttpClient)
+
         // When
         val result = apiClient.getDriverByNumber(1, 5678)
-        
+
         // Then
         assertTrue(result is ApiResult.Success)
         assertEquals(1, result.data.driverNumber)
     }
-    
+
     @Test
     fun `getDriverByNumber returns error when driver not found`() = runTest {
         // Given
         val mockHttpClient = createMockHttpClient("[]") // Empty array
-        val apiClient = F1ApiClient(mockHttpClient)
-        
+        val apiClient = F1DriverApi(mockHttpClient)
+
         // When
         val result = apiClient.getDriverByNumber(999)
-        
+
         // Then
         assertTrue(result is ApiResult.Error)
         assertEquals("Driver not found", result.message)
     }
-    
+
     @Test
     fun `getDriverByNumber returns error when API call fails`() = runTest {
         // Given
         val mockHttpClient = createMockHttpClient("", HttpStatusCode.NotFound)
-        val apiClient = F1ApiClient(mockHttpClient)
-        
+        val apiClient = F1DriverApi(mockHttpClient)
+
         // When
         val result = apiClient.getDriverByNumber(1)
-        
+
         // Then
         assertTrue(result is ApiResult.Error)
         assertTrue(result.message.isNotEmpty())
