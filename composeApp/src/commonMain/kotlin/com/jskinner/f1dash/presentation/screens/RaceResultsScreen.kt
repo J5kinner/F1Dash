@@ -19,6 +19,9 @@ import com.jskinner.f1dash.presentation.components.LoadingContent
 import com.jskinner.f1dash.presentation.viewmodels.F1RaceSideEffect
 import com.jskinner.f1dash.presentation.viewmodels.F1RaceState
 import com.jskinner.f1dash.presentation.viewmodels.F1RaceViewModel
+import f1dash.composeapp.generated.resources.Res
+import f1dash.composeapp.generated.resources.screen_title_race
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.orbitmvi.orbit.compose.collectAsState
 import org.orbitmvi.orbit.compose.collectSideEffect
@@ -29,7 +32,7 @@ fun RaceResultsScreen(
     viewModel: F1RaceViewModel = koinInject(),
     onShowToast: (String) -> Unit = {},
     onNavigateToDriverDetail: (Int) -> Unit = {},
-    onNavigateToReplay: () -> Unit = {}
+    onNavigateToReplay: (Int) -> Unit = {}
 ) {
     val state by viewModel.collectAsState()
     
@@ -37,15 +40,18 @@ fun RaceResultsScreen(
         when (sideEffect) {
             is F1RaceSideEffect.ShowToast -> onShowToast(sideEffect.message)
             is F1RaceSideEffect.NavigateToDriverDetail -> onNavigateToDriverDetail(sideEffect.driverNumber)
+            is F1RaceSideEffect.NavigateToReplay -> onNavigateToReplay(sideEffect.sessionKey)
+            F1RaceSideEffect.UnableToFetchError -> onShowToast("Unable to fetch race data")
+            F1RaceSideEffect.RefreshError -> onShowToast("Failed to refresh data")
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Race") },
+                title = { Text(stringResource(Res.string.screen_title_race)) },
                 actions = {
-                    IconButton(onClick = onNavigateToReplay) {
+                    IconButton(onClick = { viewModel.onReplayClick() }) {
                         Icon(Icons.Default.PlayArrow, contentDescription = "Race Replay")
                     }
                     IconButton(onClick = { viewModel.onRefresh() }) {
@@ -61,42 +67,29 @@ fun RaceResultsScreen(
     ) { paddingValues ->
         when (val currentState = state) {
             is F1RaceState.Loading -> {
-                if (currentState.raceData == null) {
-                    LoadingContent()
-                } else {
-                    RaceContent(
-                        raceData = currentState.raceData,
-                        onDriverClick = viewModel::onDriverClick,
-                        modifier = Modifier.padding(paddingValues)
-                    )
-                }
+                LoadingContent()
             }
             
             is F1RaceState.Error -> {
-                if (currentState.raceData == null) {
-                    ErrorContent(
-                        error = currentState.message,
-                        onRetry = viewModel::onRefresh
-                    )
-                } else {
+                ErrorContent(
+                    error = "Unable to load race data",
+                    onRetry = viewModel::onRefresh
+                )
+            }
+
+            is F1RaceState.Content -> {
+                Column {
+                    if (currentState.isRefreshing) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
                     RaceContent(
                         raceData = currentState.raceData,
                         onDriverClick = viewModel::onDriverClick,
                         modifier = Modifier.padding(paddingValues)
                     )
                 }
-            }
-            
-            is F1RaceState.Success -> {
-                RaceContent(
-                    raceData = currentState.raceData,
-                    onDriverClick = viewModel::onDriverClick,
-                    modifier = Modifier.padding(paddingValues)
-                )
-            }
-            
-            is F1RaceState.Idle -> {
-                LoadingContent()
             }
         }
     }

@@ -16,13 +16,19 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.jskinner.f1dash.domain.models.F1Session
-import com.jskinner.f1dash.presentation.viewmodels.F1PreviousRacesViewModel
-import com.jskinner.f1dash.presentation.viewmodels.F1PreviousRacesState
 import com.jskinner.f1dash.presentation.viewmodels.F1PreviousRacesSideEffect
+import com.jskinner.f1dash.presentation.viewmodels.F1PreviousRacesState
+import com.jskinner.f1dash.presentation.viewmodels.F1PreviousRacesViewModel
+import f1dash.composeapp.generated.resources.Res
+import f1dash.composeapp.generated.resources.screen_title_previous_races
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.orbitmvi.orbit.compose.collectAsState
 import org.orbitmvi.orbit.compose.collectSideEffect
-import kotlinx.datetime.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,20 +40,32 @@ fun PreviousRacesScreen(
 ) {
     val state by viewModel.collectAsState()
 
-    // Handle side effects
     viewModel.collectSideEffect { sideEffect ->
         when (sideEffect) {
             is F1PreviousRacesSideEffect.ShowToast -> onShowToast(sideEffect.message)
             is F1PreviousRacesSideEffect.NavigateToRaceResults -> onNavigateToRaceResults(sideEffect.sessionKey)
             is F1PreviousRacesSideEffect.NavigateToReplay -> onNavigateToReplay(sideEffect.sessionKey)
+            F1PreviousRacesSideEffect.UnableToFetchError -> onShowToast("Unable to fetch races")
+            F1PreviousRacesSideEffect.RefreshError -> onShowToast("Failed to refresh races")
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Previous Races") },
+                title = { Text(stringResource(Res.string.screen_title_previous_races)) },
                 actions = {
+                    when (val currentState = state) {
+                        is F1PreviousRacesState.Content -> {
+                            YearSelector(
+                                selectedYear = currentState.selectedYear,
+                                onYearSelected = viewModel::onYearSelected
+                            )
+                        }
+
+                        else -> {}
+                    }
+                    
                     IconButton(onClick = { viewModel.onRefresh() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
                     }
@@ -60,24 +78,26 @@ fun PreviousRacesScreen(
                 LoadingContent()
             }
 
-            is F1PreviousRacesState.Success -> {
-                PreviousRacesContent(
-                    races = currentState.races,
-                    onRaceClick = viewModel::onRaceClick,
-                    onReplayClick = viewModel::onReplayClick,
-                    modifier = Modifier.padding(paddingValues)
-                )
+            is F1PreviousRacesState.Content -> {
+                PullRefreshContent(
+                    isRefreshing = currentState.isRefreshing,
+                    onRefresh = viewModel::onRefresh
+                ) {
+                    PreviousRacesContent(
+                        races = currentState.races,
+                        selectedYear = currentState.selectedYear,
+                        onRaceClick = viewModel::onRaceClick,
+                        onReplayClick = viewModel::onReplayClick,
+                        modifier = Modifier.padding(paddingValues)
+                    )
+                }
             }
 
             is F1PreviousRacesState.Error -> {
                 ErrorContent(
-                    error = currentState.message,
-                    onRetry = { viewModel.onRefresh() }
+                    error = "Unable to load races",
+                    onRetry = viewModel::onRefresh
                 )
-            }
-
-            is F1PreviousRacesState.Idle -> {
-                LoadingContent()
             }
         }
     }
@@ -86,8 +106,9 @@ fun PreviousRacesScreen(
 @Composable
 private fun PreviousRacesContent(
     races: List<F1Session>,
-    onRaceClick: (F1Session) -> Unit,
-    onReplayClick: (F1Session) -> Unit,
+    selectedYear: Int,
+    onRaceClick: (Int) -> Unit,
+    onReplayClick: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -97,7 +118,7 @@ private fun PreviousRacesContent(
     ) {
         item {
             Text(
-                text = "2025 F1 Season",
+                text = "$selectedYear F1 Season",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -107,8 +128,8 @@ private fun PreviousRacesContent(
         items(races) { race ->
             RaceCard(
                 race = race,
-                onClick = { onRaceClick(race) },
-                onReplayClick = { onReplayClick(race) }
+                onClick = { onRaceClick(race.sessionKey) },
+                onReplayClick = { onReplayClick(race.sessionKey) }
             )
         }
     }
@@ -309,5 +330,78 @@ private fun isUpcomingRace(dateString: String): Boolean {
         raceInstant > currentInstant
     } catch (e: Exception) {
         false
+    }
+}
+
+@Composable
+private fun PullRefreshContent(
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Column {
+        if (isRefreshing) {
+            LinearProgressIndicator(
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        content()
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun YearSelector(
+    selectedYear: Int,
+    onYearSelected: (Int) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val availableYears = listOf(2025, 2024)
+
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            modifier = Modifier.padding(end = 8.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = selectedYear.toString(),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = "Select year",
+                modifier = Modifier.size(16.dp)
+            )
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            availableYears.forEach { year ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            text = year.toString(),
+                            fontWeight = if (year == selectedYear) FontWeight.Bold else FontWeight.Normal
+                        )
+                    },
+                    onClick = {
+                        onYearSelected(year)
+                        expanded = false
+                    },
+                    leadingIcon = if (year == selectedYear) {
+                        {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = "Selected",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    } else null
+                )
+            }
+        }
     }
 } 

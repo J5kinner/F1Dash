@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Navigation strings -->
+    <string name="navigation_race">Race</string>
+    <string name="navigation_previous_races">Previous Races</string>
+    <string name="navigation_teams">Teams</string>
+    <string name="navigation_stats">Stats</string>
+    <string name="navigation_replay">Replay</string>
+
+    <!-- Screen titles -->
+    <string name="screen_title_race">Race</string>
+    <string name="screen_title_previous_races">Previous Races</string>
+
+    <!-- Common strings -->
+    <string name="loading">Loading...</string>
+    <string name="error">Error</string>
+    <string name="retry">Retry</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+</resources>

@@ -1,6 +1,8 @@
 package com.jskinner.f1dash.domain.models
 
-import com.jskinner.f1dash.data.models.*
+import com.jskinner.f1dash.data.models.F1DriverApiResponse
+import com.jskinner.f1dash.data.models.F1SessionApiResponse
+import com.jskinner.f1dash.data.models.F1SessionResultApiResponse
 
 data class F1Driver(
     val driverNumber: Int,
@@ -157,7 +159,7 @@ fun F1SessionResultApiResponse.toDomainModel() = F1SessionResult(
     dns = dns,
     disqualified = disqualified,
     raceTime = raceTime,
-    gapToLeader = gapToLeader,
+    gapToLeader = gapToLeader?.toDoubleOrNull(),
     lapsCompleted = lapsCompleted
 )
 

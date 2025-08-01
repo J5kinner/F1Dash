@@ -35,12 +35,15 @@ kotlin {
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.android)
         }
-        
+
+
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
         }
         
         commonMain.dependencies {
+            implementation(project(":shared-models"))
+            
             // Compose Multiplatform
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -83,7 +86,12 @@ kotlin {
             
             // DateTime
             implementation(libs.datetime)
+
+            // DataStore
+            implementation(libs.datastore.core)
+            implementation(libs.datastore.preferences)
         }
+
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.ktor.client.mock)
@@ -100,6 +108,15 @@ android {
     namespace = "com.jskinner.f1dash"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
+    signingConfigs {
+        create("release") {
+            keyAlias = "f1dash"
+            keyPassword = "f1dash123"
+            storeFile = file("../f1dash-release-key.keystore")
+            storePassword = "f1dash123"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.jskinner.f1dash"
         minSdk = libs.versions.android.minSdk.get().toInt()
@@ -110,6 +127,8 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/INDEX.LIST"
+            excludes += "/META-INF/io.netty.versions.properties"
         }
     }
     buildTypes {
@@ -121,6 +140,7 @@ android {
             isMinifyEnabled = false
             buildConfigField("String", "API_BASE_URL", "\"https://api.openf1.org/v1\"")
             buildConfigField("boolean", "USE_MOCK_SERVER", "false")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     buildFeatures {
@@ -134,5 +154,6 @@ android {
 
 dependencies {
     debugImplementation(compose.uiTooling)
+    implementation(project(":server"))
 }
 

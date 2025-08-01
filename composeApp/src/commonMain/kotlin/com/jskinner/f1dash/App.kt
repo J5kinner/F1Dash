@@ -18,11 +18,7 @@ import com.jskinner.f1dash.di.modules.appModules
 import com.jskinner.f1dash.presentation.navigation.F1BottomNavigation
 import com.jskinner.f1dash.presentation.navigation.F1Destinations
 import com.jskinner.f1dash.presentation.navigation.F1NavigationHandler
-import com.jskinner.f1dash.presentation.screens.PreviousRacesScreen
-import com.jskinner.f1dash.presentation.screens.F1ReplayScreen
-import com.jskinner.f1dash.presentation.screens.RaceResultsScreen
-import com.jskinner.f1dash.presentation.screens.StatsScreen
-import com.jskinner.f1dash.presentation.screens.TeamsScreen
+import com.jskinner.f1dash.presentation.screens.*
 import com.jskinner.f1dash.presentation.theme.F1Theme
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import org.koin.compose.KoinApplication
@@ -62,7 +58,9 @@ fun App() {
                         RaceResultsScreen(
                             onShowToast = navigationHandler::showToast,
                             onNavigateToDriverDetail = navigationHandler::navigateToDriverDetail,
-                            onNavigateToReplay = navigationHandler::navigateToReplay
+                            onNavigateToReplay = { sessionKey ->
+                                navController.navigate("${F1Destinations.Replay.route}/$sessionKey")
+                            }
                         )
                     }
 

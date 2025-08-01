@@ -4,6 +4,7 @@ import com.jskinner.f1dash.data.models.ApiResult
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.http.*
 import kotlinx.coroutines.delay
 
 abstract class BaseApiClient(val httpClient: HttpClient) {
@@ -31,9 +32,17 @@ abstract class BaseApiClient(val httpClient: HttpClient) {
                     parameter(key, value.toString())
                 }
             }
-            println("✅ API request successful: ${response.status}")
-            val result = response.body<T>()
-            ApiResult.Success(result)
+
+            if (response.status.isSuccess()) {
+                println("✅ API request successful: ${response.status}")
+                val result = response.body<T>()
+                ApiResult.Success(result)
+            } else {
+                val errorBody = response.body<String>()
+                println("❌ API request failed: ${response.status}")
+                println("🔍 Error response: $errorBody")
+                ApiResult.Error("API error ${response.status.value}: $errorBody")
+            }
         } catch (e: Exception) {
             println("❌ API request failed: ${e.message}")
             println("🔍 Exception type: ${e::class.simpleName}")
@@ -59,9 +68,17 @@ abstract class BaseApiClient(val httpClient: HttpClient) {
                     parameter(key, value.toString())
                 }
             }
-            println("✅ API request successful: ${response.status}")
-            val result = body()
-            ApiResult.Success(result)
+
+            if (response.status.isSuccess()) {
+                println("✅ API request successful: ${response.status}")
+                val result = body()
+                ApiResult.Success(result)
+            } else {
+                val errorBody = response.body<String>()
+                println("❌ API request failed: ${response.status}")
+                println("🔍 Error response: $errorBody")
+                ApiResult.Error("API error ${response.status.value}: $errorBody")
+            }
         } catch (e: Exception) {
             println("❌ API request failed: ${e.message}")
             println("🔍 Exception type: ${e::class.simpleName}")

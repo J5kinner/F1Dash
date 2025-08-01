@@ -1,248 +1,312 @@
 package com.jskinner.f1dash.data.transformers
 
 import com.jskinner.f1dash.data.api.OpenF1RaceReplayData
-import com.jskinner.f1dash.data.models.*
+import com.jskinner.f1dash.data.models.OpenF1IntervalResponse
+import com.jskinner.f1dash.data.models.OpenF1LapResponse
+import com.jskinner.f1dash.data.models.OpenF1PitResponse
+import com.jskinner.f1dash.data.models.OpenF1StintResponse
 import com.jskinner.f1dash.domain.models.*
 
 object OpenF1DataTransformer {
 
     fun transformToRaceReplay(
-        openF1Data: OpenF1RaceReplayData,
         session: F1Session,
-        drivers: Map<Int, F1Driver>
+        drivers: Map<Int, F1Driver>,
+        openF1Data: OpenF1RaceReplayData
     ): F1RaceReplay {
-        val frames = buildReplayFrames(openF1Data, drivers)
-        val totalLaps = openF1Data.laps.maxOfOrNull { it.lapNumber } ?: 0
-        val raceDuration = calculateRaceDuration(openF1Data)
+        println("\n=== OPENF1 DATA TRANSFORMER ===")
+        println("Processing session: ${session.circuitName} (${session.sessionKey})")
+        println("Available drivers: ${drivers.keys.sorted().joinToString()}")
+        println("OpenF1 Data:")
+//        println("  - Positions: ${openF1Data.positions.size} entries")
+        println("  - Laps: ${openF1Data.laps.size} entries")
+        println("  - Intervals: ${openF1Data.intervals.size} entries")
+        println("  - Stints: ${openF1Data.stints.size} entries")
+        println("  - Pit stops: ${openF1Data.pitStops.size} entries")
+
+        if (openF1Data.laps.isNotEmpty()) {
+            println("\nSample lap data:")
+            openF1Data.laps.take(5).forEach { lap ->
+                println("  Driver ${lap.driverNumber}, Lap ${lap.lapNumber}: ${lap.lapDuration}s")
+            }
+        }
+
+        if (openF1Data.stints.isNotEmpty()) {
+            println("\nSample stint data:")
+            openF1Data.stints.take(5).forEach { stint ->
+                println("  Driver ${stint.driverNumber}, Stint ${stint.stintNumber}: ${stint.compound} (Laps ${stint.lapStart}-${stint.lapEnd})")
+            }
+        }
+
+        val frames = createReplayFrames(openF1Data, drivers)
+
+        val finalFrames = frames.ifEmpty {
+            println("No OpenF1 frames created, using fallback data with available stint information")
+            createFallbackFramesWithStints(drivers, openF1Data.stints, openF1Data.pitStops)
+        }
+
+        val totalLaps = finalFrames.maxOfOrNull { it.lapNumber } ?: 50
+        val raceDuration = calculateRaceDuration(finalFrames)
+
+        println("Final result: ${finalFrames.size} frames, ${totalLaps} laps")
+        println("===============================\n")
 
         return F1RaceReplay(
             session = session,
-            frames = frames.sortedBy { it.lapNumber },
+            frames = finalFrames,
             totalLaps = totalLaps,
             raceDuration = raceDuration,
             drivers = drivers
         )
     }
 
-    private fun buildReplayFrames(
+    private fun createReplayFrames(
         openF1Data: OpenF1RaceReplayData,
         drivers: Map<Int, F1Driver>
     ): List<F1ReplayFrame> {
-        val frames = mutableListOf<F1ReplayFrame>()
-
-        // Get all lap numbers from lap data (this is more reliable than positions)
-        val lapNumbersFromLaps = openF1Data.laps.map { it.lapNumber }.distinct().sorted()
-
-        if (lapNumbersFromLaps.isEmpty()) {
-            // Fallback: create frames based on available data
-            return listOf(createFallbackFrame(openF1Data, drivers))
-        }
-
-        for (lapNumber in lapNumbersFromLaps) {
-            val frame = buildFrameForLap(lapNumber, openF1Data, drivers)
-            if (frame.driverPositions.isNotEmpty()) {
-                frames.add(frame)
+        val lapsByDriver = openF1Data.laps
+            .groupBy { it.driverNumber }
+            .mapValues { (_, laps) ->
+                laps.associateBy { it.lapNumber }
             }
-        }
 
-        return frames
-    }
+        val stintsByDriver = openF1Data.stints
+            .groupBy { it.driverNumber }
+            .mapValues { (_, stints) -> stints.sortedBy { it.stintNumber } }
 
-    private fun createFallbackFrame(
-        openF1Data: OpenF1RaceReplayData,
-        drivers: Map<Int, F1Driver>
-    ): F1ReplayFrame {
-        // Create a single frame with all available data
-        val driverNumbers = drivers.keys
-        val driverPositions = driverNumbers.mapNotNull { driverNumber ->
-            val mostRecentPosition = openF1Data.positions
-                .filter { it.driverNumber == driverNumber }
-                .maxByOrNull { it.date }
+        val pitStopsByDriver = openF1Data.pitStops
+            .groupBy { it.driverNumber }
+            .mapValues { (_, pitStops) -> pitStops.sortedBy { it.lapNumber } }
 
-            val lapData = openF1Data.laps
-                .filter { it.driverNumber == driverNumber }
-                .maxByOrNull { it.lapNumber }
+        // Group intervals by lap for gap information
+        val intervalsByLap = openF1Data.intervals
+            .groupBy { extractLapNumberFromInterval(it, lapsByDriver) }
+            .mapValues { (_, intervals) ->
+                intervals.associateBy { it.driverNumber }
+            }
 
-            if (mostRecentPosition != null) {
-                F1DriverPosition(
-                    driverNumber = driverNumber,
-                    position = mostRecentPosition.position,
-                    gap = "0.000",
-                    lapTime = formatLapTime(lapData?.lapDuration),
-                    tyre = "UNKNOWN",
-                    pitStops = 0
+        // Group positions by lap - this is the key data for real positions!
+//        val positionsByLap = openF1Data.positions
+//            .groupBy { extractLapNumberFromPosition(it, lapsByDriver) }
+//            .mapValues { (_, positions) ->
+//                positions.associateBy { it.driverNumber }
+//            }
+
+        val allLaps = openF1Data.laps
+            .map { it.lapNumber }
+            .distinct()
+            .sorted()
+
+        return allLaps.mapNotNull { lap ->
+            val driverPositions = createDriverPositionsForLap(
+                lap = lap,
+                drivers = drivers,
+                lapsByDriver = lapsByDriver,
+                stintsByDriver = stintsByDriver,
+                pitStopsByDriver = pitStopsByDriver,
+                intervalsByLap = intervalsByLap,
+//                positionsByLap = positionsByLap
+            )
+
+            if (driverPositions.isNotEmpty()) {
+                F1ReplayFrame(
+                    lapNumber = lap,
+                    elapsedTime = calculateElapsedTimeForLap(lap, lapsByDriver),
+                    driverPositions = driverPositions.sortedBy { it.position }
                 )
             } else null
-        }.sortedBy { it.position }
-
-        return F1ReplayFrame(
-            lapNumber = 1,
-            elapsedTime = 0.0,
-            driverPositions = driverPositions
-        )
+        }
     }
 
-    private fun buildFrameForLap(
-        lapNumber: Int,
-        openF1Data: OpenF1RaceReplayData,
-        drivers: Map<Int, F1Driver>
-    ): F1ReplayFrame {
-        val driverPositions = mutableListOf<F1DriverPosition>()
+    private fun createDriverPositionsForLap(
+        lap: Int,
+        drivers: Map<Int, F1Driver>,
+        lapsByDriver: Map<Int, Map<Int, OpenF1LapResponse>>,
+        stintsByDriver: Map<Int, List<OpenF1StintResponse>>,
+        pitStopsByDriver: Map<Int, List<OpenF1PitResponse>>,
+        intervalsByLap: Map<Int, Map<Int, OpenF1IntervalResponse>>
+    ): List<F1DriverPosition> {
+        val driversWithCumulativeTime = drivers.keys.mapNotNull { driverNumber ->
+            val driverLaps = lapsByDriver[driverNumber] ?: emptyMap()
 
-        // Get all driver numbers from this lap's data
-        val lapsAtThisNumber = openF1Data.laps.filter { it.lapNumber == lapNumber }
-        val driverNumbers = if (lapsAtThisNumber.isNotEmpty()) {
-            lapsAtThisNumber.map { it.driverNumber }.distinct()
-        } else {
-            drivers.keys.toList()
-        }
-
-        for (driverNumber in driverNumbers) {
-            val mostRecentPosition = findMostRecentPositionForLap(driverNumber, lapNumber, openF1Data.positions)
-            val lapData = lapsAtThisNumber.find { it.driverNumber == driverNumber }
-            val intervalData = findMostRecentIntervalForLap(driverNumber, lapNumber, openF1Data.intervals)
-            val currentStint = findCurrentStint(driverNumber, lapNumber, openF1Data.stints)
-            val pitStops = countPitStopsUpToLap(driverNumber, lapNumber, openF1Data.pitStops)
-
-            // Skip if we don't have position data for this driver
-            val position = mostRecentPosition?.position ?: continue
-
-            val gap = formatGap(intervalData?.gap, intervalData?.interval)
-
-            // Show the actual lap time for this specific lap, or the most recent one
-            val lapTime = when {
-                lapData?.lapDuration != null -> formatLapTime(lapData.lapDuration)
-                else -> findMostRecentLapTime(driverNumber, lapNumber, openF1Data.laps)
+            val cumulativeTime = (1..lap).sumOf { lapNum ->
+                driverLaps[lapNum]?.lapDuration ?: 90.0 // Default 90s if no data
             }
 
-            val tyre = currentStint?.compound ?: "UNKNOWN"
+            val currentLapData = driverLaps[lap]
 
-            driverPositions.add(
+            Triple(driverNumber, cumulativeTime, currentLapData)
+        }.sortedBy { it.second } // Sort by cumulative race time for realistic positions
+        val gap = intervalsByLap[lap].toString()
+
+        return if (driversWithCumulativeTime.isEmpty()) {
+            drivers.toList().mapIndexed { index, (driverNumber, _) ->
                 F1DriverPosition(
                     driverNumber = driverNumber,
-                    position = position,
+                    position = index + 1,
                     gap = gap,
-                    lapTime = lapTime,
-                    tyre = tyre,
-                    pitStops = pitStops
+                    lapTime = "--:--.---",
+                    tyre = getTyreCompoundForLap(lap, stintsByDriver[driverNumber] ?: emptyList()),
+                    pitStops = getPitStopCountAtLap(lap, pitStopsByDriver[driverNumber] ?: emptyList())
                 )
-            )
+            }
+        } else {
+            val leaderTime = driversWithCumulativeTime.firstOrNull()?.second ?: 0.0
+
+            driversWithCumulativeTime.mapIndexed { index, (driverNumber, cumulativeTime, currentLapData) ->
+                val tyreCompound = getTyreCompoundForLap(lap, stintsByDriver[driverNumber] ?: emptyList())
+                val pitStopCount = getPitStopCountAtLap(lap, pitStopsByDriver[driverNumber] ?: emptyList())
+                val intervalData = intervalsByLap[lap]?.get(driverNumber)
+
+                val gapToLeader = if (index == 0) {
+                    "0.000"
+                } else {
+                    val timeDiff = cumulativeTime - leaderTime
+                    "+${timeDiff}"
+                }
+
+                F1DriverPosition(
+                    driverNumber = driverNumber,
+                    position = index + 1,
+                    gap = intervalData?.gap ?: gapToLeader,
+                    lapTime = formatLapTime(currentLapData?.lapDuration),
+                    tyre = tyreCompound,
+                    pitStops = pitStopCount
+                )
+            }
         }
-
-        val elapsedTime = calculateElapsedTime(lapNumber, openF1Data.laps)
-
-        return F1ReplayFrame(
-            lapNumber = lapNumber,
-            elapsedTime = elapsedTime,
-            driverPositions = driverPositions.sortedBy { it.position }
-        )
     }
 
-    private fun findMostRecentPositionForLap(
-        driverNumber: Int,
-        targetLapNumber: Int,
-        positions: List<OpenF1PositionResponse>
-    ): OpenF1PositionResponse? {
-        return positions
-            .filter { it.driverNumber == driverNumber }
-            .sortedByDescending { it.date }
-            .firstOrNull()
-    }
-
-    private fun findMostRecentIntervalForLap(
-        driverNumber: Int,
-        targetLapNumber: Int,
-        intervals: List<OpenF1IntervalResponse>
-    ): OpenF1IntervalResponse? {
-        return intervals
-            .filter { it.driverNumber == driverNumber }
-            .sortedByDescending { it.date }
-            .firstOrNull()
-    }
-
-    private fun findCurrentStint(
-        driverNumber: Int,
-        lapNumber: Int,
+    private fun getTyreCompoundForLap(
+        lap: Int,
         stints: List<OpenF1StintResponse>
-    ): OpenF1StintResponse? {
-        return stints
-            .filter { it.driverNumber == driverNumber }
-            .filter { lapNumber >= it.lapStart }
-            .filter { it.lapEnd == null || lapNumber <= it.lapEnd }
-            .maxByOrNull { it.stintNumber }
+    ): String {
+        val currentStint = stints.find { stint ->
+            val lapStart = stint.lapStart ?: 1
+            val lapEnd = stint.lapEnd ?: Int.MAX_VALUE
+            lap in lapStart..lapEnd
+        }
+        return currentStint?.compound ?: ""
     }
 
-    private fun countPitStopsUpToLap(
-        driverNumber: Int,
-        lapNumber: Int,
+    private fun getPitStopCountAtLap(
+        lap: Int,
         pitStops: List<OpenF1PitResponse>
     ): Int {
-        return pitStops
-            .filter { it.driverNumber == driverNumber }
-            .count { it.lapNumber <= lapNumber }
-    }
-
-    private fun findMostRecentLapTime(
-        driverNumber: Int,
-        upToLapNumber: Int,
-        laps: List<OpenF1LapResponse>
-    ): String {
-        val recentLap = laps
-            .filter { it.driverNumber == driverNumber }
-            .filter { it.lapNumber <= upToLapNumber }
-            .filter { it.lapDuration != null && it.lapDuration > 0 }
-            .maxByOrNull { it.lapNumber }
-
-        return formatLapTime(recentLap?.lapDuration)
-    }
-
-    private fun formatGap(gap: Double?, interval: Double?): String {
-        return when {
-            gap == null && interval == null -> "+0.000"
-            gap != null && gap == 0.0 -> "0.000"
-            gap != null -> "+${(gap * 1000).toInt() / 1000.0}"
-            interval != null -> "+${(interval * 1000).toInt() / 1000.0}"
-            else -> "+0.000"
-        }
+        return pitStops.count { it.lapNumber <= lap }
     }
 
     private fun formatLapTime(lapDuration: Double?): String {
-        if (lapDuration == null || lapDuration <= 0) return "--:--"
+        if (lapDuration == null || lapDuration <= 0) return "--:--.---"
 
-        val totalSeconds = lapDuration
-        val minutes = (totalSeconds / 60).toInt()
-        val seconds = totalSeconds % 60
+        val minutes = (lapDuration / 60).toInt()
+        val seconds = lapDuration % 60
         val wholeSeconds = seconds.toInt()
         val milliseconds = ((seconds - wholeSeconds) * 1000).toInt()
 
         return "${minutes}:${wholeSeconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}"
     }
 
-    private fun calculateElapsedTime(lapNumber: Int, laps: List<OpenF1LapResponse>): Double {
-        return laps
-            .filter { it.lapNumber <= lapNumber }
-            .mapNotNull { it.lapDuration }
-            .sum()
+    private fun extractLapNumberFromInterval(
+        interval: OpenF1IntervalResponse,
+        lapsByDriver: Map<Int, Map<Int, OpenF1LapResponse>>
+    ): Int {
+        val driverLaps = lapsByDriver[interval.driverNumber] ?: return 1
+
+        val availableLaps = driverLaps.keys.sorted()
+        if (availableLaps.isEmpty()) return 1
+
+        return availableLaps.random()
     }
 
-    private fun calculateRaceDuration(openF1Data: OpenF1RaceReplayData): Double {
-        return openF1Data.laps.mapNotNull { it.lapDuration }.sum()
+    private fun createFallbackFramesWithStints(
+        drivers: Map<Int, F1Driver>,
+        stints: List<OpenF1StintResponse>,
+        pitStops: List<OpenF1PitResponse>
+    ): List<F1ReplayFrame> {
+        val stintsByDriver = stints.groupBy { it.driverNumber }
+            .mapValues { (_, stints) -> stints.sortedBy { it.stintNumber } }
+
+        val pitStopsByDriver = pitStops.groupBy { it.driverNumber }
+            .mapValues { (_, pitStops) -> pitStops.sortedBy { it.lapNumber } }
+
+        val maxLapFromStints = stints.mapNotNull { it.lapEnd }.maxOrNull() ?: 50
+        val totalLaps = maxLapFromStints.coerceAtLeast(50)
+
+        println("Creating fallback frames with ${totalLaps} laps using stint data")
+
+        return (1..totalLaps).map { lap ->
+            val driverPositions = drivers.toList().mapIndexed { index, (driverNumber, _) ->
+                val gapVariation = kotlin.random.Random.nextDouble(-1.0, 2.0)
+                val baseGap = index * 3.0 + gapVariation
+
+                val tyreCompound = getTyreCompoundForLap(lap, stintsByDriver[driverNumber] ?: emptyList())
+                val pitStopCount = getPitStopCountAtLap(lap, pitStopsByDriver[driverNumber] ?: emptyList())
+
+                F1DriverPosition(
+                    driverNumber = driverNumber,
+                    position = index + 1,
+                    gap = if (index == 0) "0.000" else "+${baseGap.coerceAtLeast(0.0)}",
+                    lapTime = generateRandomLapTime(),
+                    tyre = tyreCompound,
+                    pitStops = pitStopCount
+                )
+            }
+
+            F1ReplayFrame(
+                lapNumber = lap,
+                elapsedTime = lap * 90.0,
+                driverPositions = driverPositions
+            )
+        }
     }
 
-    fun transformOpenF1PositionToDriverPosition(
-        position: OpenF1PositionResponse,
-        lapData: OpenF1LapResponse?,
-        intervalData: OpenF1IntervalResponse?,
-        stint: OpenF1StintResponse?,
-        pitStopCount: Int
-    ): F1DriverPosition {
-        return F1DriverPosition(
-            driverNumber = position.driverNumber,
-            position = position.position,
-            gap = formatGap(intervalData?.gap, intervalData?.interval),
-            lapTime = formatLapTime(lapData?.lapDuration),
-            tyre = stint?.compound ?: "UNKNOWN",
-            pitStops = pitStopCount
-        )
+    private fun createFallbackFrames(drivers: Map<Int, F1Driver>): List<F1ReplayFrame> {
+        val totalLaps = 50
+        return (1..totalLaps).map { lap ->
+            val driverPositions = drivers.toList().mapIndexed { index, (driverNumber, _) ->
+                F1DriverPosition(
+                    driverNumber = driverNumber,
+                    position = index + 1,
+                    gap = if (index == 0) "0.000" else "+${index * 3.0}",
+                    lapTime = generateRandomLapTime(),
+                    tyre = "",
+                    pitStops = if (lap > 20) 1 else 0
+                )
+            }
+
+            F1ReplayFrame(
+                lapNumber = lap,
+                elapsedTime = lap * 90.0,
+                driverPositions = driverPositions
+            )
+        }
+    }
+
+    private fun generateRandomLapTime(): String {
+        val baseTimeSeconds = 80 + kotlin.random.Random.nextDouble() * 15
+        val minutes = (baseTimeSeconds / 60).toInt()
+        val seconds = baseTimeSeconds % 60
+        val wholeSeconds = seconds.toInt()
+        val milliseconds = ((seconds - wholeSeconds) * 1000).toInt()
+
+        return "${minutes}:${wholeSeconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}"
+    }
+
+    private fun calculateElapsedTimeForLap(lap: Int, lapsByDriver: Map<Int, Map<Int, OpenF1LapResponse>>): Double {
+        val averageLapDuration = lapsByDriver.values
+            .mapNotNull { driverLaps -> driverLaps[lap]?.lapDuration }
+            .takeIf { it.isNotEmpty() }
+            ?.average()
+
+        return if (averageLapDuration != null) {
+            lap * averageLapDuration
+        } else {
+            lap * 90.0
+        }
+    }
+
+    private fun calculateRaceDuration(frames: List<F1ReplayFrame>): Double {
+        return frames.lastOrNull()?.elapsedTime ?: 0.0
     }
 }

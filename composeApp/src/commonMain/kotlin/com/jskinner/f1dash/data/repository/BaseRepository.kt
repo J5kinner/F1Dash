@@ -6,29 +6,35 @@ import kotlinx.coroutines.flow.flow
 
 abstract class BaseRepository {
 
-    protected fun <T> handleApiCall(
-        apiCall: suspend () -> ApiResult<T>,
-        transform: (T) -> T = { it }
+    protected suspend fun <T> handleApiCall(
+        apiCall: suspend () -> ApiResult<T>
     ): Flow<ApiResult<T>> = flow {
         emit(ApiResult.Loading)
-        val result = apiCall()
-        when (result) {
-            is ApiResult.Success -> emit(ApiResult.Success(transform(result.data)))
-            is ApiResult.Error -> emit(ApiResult.Error(result.message))
-            is ApiResult.Loading -> emit(ApiResult.Loading)
+        try {
+            val result = apiCall()
+            emit(result)
+        } catch (e: Exception) {
+            emit(ApiResult.Error(e.message ?: "Unknown error occurred"))
         }
     }
 
-    protected fun <T, R> handleApiCallWithTransform(
+    protected suspend fun <T, R> handleApiCallWithTransform(
         apiCall: suspend () -> ApiResult<T>,
-        transform: (T) -> R
+        transform: suspend (T) -> R
     ): Flow<ApiResult<R>> = flow {
         emit(ApiResult.Loading)
-        val result = apiCall()
-        when (result) {
-            is ApiResult.Success -> emit(ApiResult.Success(transform(result.data)))
-            is ApiResult.Error -> emit(ApiResult.Error(result.message))
-            is ApiResult.Loading -> emit(ApiResult.Loading)
+        try {
+            when (val result = apiCall()) {
+                is ApiResult.Success -> {
+                    val transformedData = transform(result.data)
+                    emit(ApiResult.Success(transformedData))
+                }
+
+                is ApiResult.Error -> emit(ApiResult.Error(result.message))
+                is ApiResult.Loading -> emit(ApiResult.Loading)
+            }
+        } catch (e: Exception) {
+            emit(ApiResult.Error(e.message ?: "Unknown error occurred"))
         }
     }
 } 
