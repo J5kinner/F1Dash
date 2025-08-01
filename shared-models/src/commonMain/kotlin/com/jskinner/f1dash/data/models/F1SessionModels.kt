@@ -1,7 +1,7 @@
 package com.jskinner.f1dash.data.models
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 @Serializable
 data class F1SessionApiResponse(
@@ -54,7 +54,7 @@ data class F1SessionResultApiResponse(
     @SerialName("race_time")
     val raceTime: Double? = null,
     @SerialName("gap_to_leader")
-    val gapToLeader: Double? = null,
+    val gapToLeader: String? = null,
     @SerialName("laps_completed")
     val lapsCompleted: Int? = null
 )

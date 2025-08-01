@@ -61,10 +61,26 @@ class F1ReplayViewModel(
 
                         is ApiResult.Success -> {
                             val raceReplay = result.data
+
+                            println("=== RACE REPLAY DATA LOADED ===")
+                            println("Session: ${raceReplay.session.circuitName} (${raceReplay.session.sessionKey})")
+                            println("Total Frames: ${raceReplay.frames.size}")
+                            println("Total Laps: ${raceReplay.totalLaps}")
+                            println("Race Duration: ${raceReplay.raceDuration}s")
+                            println("Drivers: ${raceReplay.drivers.keys.sorted().joinToString()}")
+                            
                             if (raceReplay.frames.isEmpty()) {
+                                println("ERROR: No frames available!")
                                 reduce { F1ReplayScreenState.Error("No replay data available for this session") }
                                 return@collect
                             }
+
+                            // Log first few frames as sample
+                            println("\n=== SAMPLE FRAME DATA ===")
+                            raceReplay.frames.take(3).forEach { frame ->
+                                logFrameData(frame)
+                            }
+                            println("===========================\n")
 
                             val replayState = F1ReplayState(
                                 isPlaying = false,
@@ -178,6 +194,9 @@ class F1ReplayViewModel(
                     }
 
                     val nextFrame = latestState.raceReplay.frames[nextFrameIndex]
+
+                    // Log frame data as we advance through the replay
+                    logFrameData(nextFrame)
                     
                     reduce {
                         latestState.copy(
@@ -193,6 +212,23 @@ class F1ReplayViewModel(
     private fun stopPlayback() {
         playbackJob?.cancel()
         playbackJob = null
+    }
+
+    private fun logFrameData(frame: F1ReplayFrame) {
+        println("\n--- LAP ${frame.lapNumber} (${frame.elapsedTime.toInt()}s) ---")
+        frame.driverPositions.forEach { position ->
+            val driverName = currentSessionKey.let { _ ->
+                // Get driver name from the current state
+                val currentState = container.stateFlow.value
+                if (currentState is F1ReplayScreenState.Ready) {
+                    currentState.drivers[position.driverNumber]?.nameAcronym ?: "DR${position.driverNumber}"
+                } else {
+                    "DR${position.driverNumber}"
+                }
+            }
+
+            println("  P${position.position}: $driverName | Gap: ${position.gap} | Time: ${position.lapTime} | Tyre: ${position.tyre.ifEmpty { "---" }} | Stops: ${position.pitStops}")
+        }
     }
 
     override fun onCleared() {

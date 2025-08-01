@@ -520,7 +520,7 @@ object MockDataGenerator {
                         } else {
                             val currentGap = gapValue.toDoubleOrNull() ?: 0.0
                             val prevGap = previousGap.toDoubleOrNull() ?: 0.0
-                            String.format("%.3f", currentGap - prevGap)
+                            (currentGap - prevGap).toString()
                         }
                     }
                 }
@@ -630,7 +630,14 @@ object MockDataGenerator {
                         0.0,
                         15.0
                     ),
-                    gapToLeader = if (finalPosition == 1) 0.0 else (finalPosition * 6.0) + Random.nextDouble(0.0, 12.0),
+                    gapToLeader = if (finalPosition == 1) "0.000" else {
+                        val gap = (finalPosition * 6.0) + Random.nextDouble(0.0, 12.0)
+                        if (finalPosition > 15 && Random.nextBoolean()) {
+                            "+${finalPosition - 15} LAP${if (finalPosition - 15 > 1) "S" else ""}"
+                        } else {
+                            String.format("%.3f", gap)
+                        }
+                    },
                     lapsCompleted = 50
                 )
             )

@@ -43,6 +43,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
+            implementation(project(":shared-models"))
             implementation(libs.serialization.json)
             implementation(libs.coroutines.core)
             implementation(libs.datetime)
@@ -51,12 +52,12 @@ kotlin {
             implementation("io.ktor:ktor-server-content-negotiation:${libs.versions.ktor.get()}")
             implementation("io.ktor:ktor-serialization-kotlinx-json:${libs.versions.ktor.get()}")
             implementation("io.ktor:ktor-server-cors:${libs.versions.ktor.get()}")
-            implementation("io.ktor:ktor-server-call-logging:${libs.versions.ktor.get()}")
         }
 
         jvmMain.dependencies {
             implementation("io.ktor:ktor-server-netty:${libs.versions.ktor.get()}")
             implementation("ch.qos.logback:logback-classic:1.4.14")
+            implementation(libs.ktor.server.call.logging)
         }
     }
 }

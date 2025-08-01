@@ -34,16 +34,16 @@ kotlin {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.ktor.client.android)
-            implementation(project(":server"))
         }
 
 
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
-            implementation(project(":server"))
         }
         
         commonMain.dependencies {
+            implementation(project(":shared-models"))
+            
             // Compose Multiplatform
             implementation(compose.runtime)
             implementation(compose.foundation)
@@ -154,5 +154,6 @@ android {
 
 dependencies {
     debugImplementation(compose.uiTooling)
+    implementation(project(":server"))
 }
 

@@ -30,8 +30,11 @@ class RaceDataFetcher(
         }
     }
 
-    suspend fun fetchLatestRaceData(): ApiResult<F1RaceData> {
+    suspend fun fetchLatestRaceData(forceRefresh: Boolean = false): ApiResult<F1RaceData> {
         return try {
+            if (forceRefresh) {
+            }
+            
             val session = getLatestRaceSession()
             val sessionKey = session.sessionKey
             val drivers = getDriversData(sessionKey)

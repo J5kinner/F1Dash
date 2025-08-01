@@ -19,10 +19,13 @@ import com.jskinner.f1dash.domain.models.F1Session
 import com.jskinner.f1dash.presentation.viewmodels.F1PreviousRacesSideEffect
 import com.jskinner.f1dash.presentation.viewmodels.F1PreviousRacesState
 import com.jskinner.f1dash.presentation.viewmodels.F1PreviousRacesViewModel
+import f1dash.composeapp.generated.resources.Res
+import f1dash.composeapp.generated.resources.screen_title_previous_races
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import org.jetbrains.compose.resources.stringResource
 import org.koin.compose.koinInject
 import org.orbitmvi.orbit.compose.collectAsState
 import org.orbitmvi.orbit.compose.collectSideEffect
@@ -50,7 +53,7 @@ fun PreviousRacesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Previous Races") },
+                title = { Text(stringResource(Res.string.screen_title_previous_races)) },
                 actions = {
                     when (val currentState = state) {
                         is F1PreviousRacesState.Content -> {

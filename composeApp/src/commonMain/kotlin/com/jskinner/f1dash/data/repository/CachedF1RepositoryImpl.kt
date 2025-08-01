@@ -1,8 +1,10 @@
 package com.jskinner.f1dash.data.repository
 
+import com.jskinner.f1dash.data.MockReplayGenerator
 import com.jskinner.f1dash.data.api.F1DriverApi
 import com.jskinner.f1dash.data.api.F1SessionApi
 import com.jskinner.f1dash.data.api.OpenF1Api
+import com.jskinner.f1dash.data.api.getApiConfig
 import com.jskinner.f1dash.data.cache.ResponseCache
 import com.jskinner.f1dash.data.models.ApiResult
 import com.jskinner.f1dash.data.transformers.OpenF1DataTransformer
@@ -19,6 +21,7 @@ class CachedF1RepositoryImpl(
 ) : BaseRepository(), F1Repository {
 
     private val raceDataFetcher = RaceDataFetcher(f1DriverApi, f1SessionApi)
+    private val apiConfig = getApiConfig()
 
     init {
         raceDataCache.cacheTimeInSeconds = 300
@@ -120,26 +123,42 @@ class CachedF1RepositoryImpl(
                         is ApiResult.Loading -> throw Exception("Loading state not expected")
                     }
 
-                    val openF1Result = openF1Api.getRaceReplayData(sessionKey)
-                    when (openF1Result) {
-                        is ApiResult.Success -> {
-                            ApiResult.Success(
-                                OpenF1DataTransformer.transformToRaceReplay(
-                                    openF1Data = openF1Result.data,
-                                    session = session,
-                                    drivers = drivers
-                                )
+                    val raceReplay = if (apiConfig.isDebugMode) {
+                        MockReplayGenerator.generateRaceReplay(
+                            session = session,
+                            drivers = drivers
+                        )
+                    } else {
+                        try {
+                            val raceReplayDataResult = openF1Api.getRaceReplayData(sessionKey)
+                            when (raceReplayDataResult) {
+                                is ApiResult.Success -> {
+                                    OpenF1DataTransformer.transformToRaceReplay(
+                                        session = session,
+                                        drivers = drivers,
+                                        openF1Data = raceReplayDataResult.data
+                                    )
+                                }
+
+                                is ApiResult.Error -> {
+                                    MockReplayGenerator.generateRaceReplay(
+                                        session = session,
+                                        drivers = drivers
+                                    )
+                                }
+
+                                is ApiResult.Loading -> throw Exception("Loading state not expected")
+                            }
+                        } catch (e: Exception) {
+                            //TODO: Questionable code here?
+                            MockReplayGenerator.generateRaceReplay(
+                                session = session,
+                                drivers = drivers
                             )
                         }
-
-                        is ApiResult.Error -> {
-                            throw Exception("Failed to get race replay data: ${openF1Result.message}")
-                        }
-
-                        is ApiResult.Loading -> {
-                            throw Exception("Loading state not expected")
-                        }
                     }
+
+                    ApiResult.Success(raceReplay)
                 } catch (e: Exception) {
                     throw Exception(e.message ?: "Error fetching race replay data")
                 }

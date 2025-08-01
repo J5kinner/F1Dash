@@ -18,6 +18,7 @@ sealed interface F1RaceState {
 sealed class F1RaceSideEffect {
     data class ShowToast(val message: String) : F1RaceSideEffect()
     data class NavigateToDriverDetail(val driverNumber: Int) : F1RaceSideEffect()
+    data class NavigateToReplay(val sessionKey: Int) : F1RaceSideEffect()
     data object UnableToFetchError : F1RaceSideEffect()
     data object RefreshError : F1RaceSideEffect()
 }
@@ -81,6 +82,26 @@ class F1RaceViewModel(
 
     fun onDriverClick(driverNumber: Int) = intent {
         postSideEffect(F1RaceSideEffect.NavigateToDriverDetail(driverNumber))
+    }
+
+    fun onReplayClick() = intent {
+        runCatching {
+            f1Repository.getLatestRaceSession().collect { result ->
+                when (result) {
+                    is ApiResult.Success -> {
+                        postSideEffect(F1RaceSideEffect.NavigateToReplay(result.data.sessionKey))
+                    }
+
+                    is ApiResult.Error -> {
+                        postSideEffect(F1RaceSideEffect.ShowToast("Unable to load latest race session"))
+                    }
+
+                    is ApiResult.Loading -> {}
+                }
+            }
+        }.onFailure {
+            postSideEffect(F1RaceSideEffect.ShowToast("Error loading latest race session"))
+        }
     }
 
     private fun handleError(error: Throwable) = intent {

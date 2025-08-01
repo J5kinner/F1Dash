@@ -1,7 +1,7 @@
 package com.jskinner.f1dash.data.models
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 @Serializable
 data class F1DriverApiResponse(
